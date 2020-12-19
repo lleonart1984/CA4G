@@ -1,4 +1,5 @@
 #include "ca4g_errors.h"
+#include <iostream>
 
 namespace CA4G {
 
@@ -7,7 +8,7 @@ namespace CA4G {
 		static char fullMessage[1000];
 
 		ZeroMemory(&fullMessage, sizeof(fullMessage));
-
+		
 		const char* errorMessage;
 
 		switch (error) {
@@ -50,6 +51,8 @@ namespace CA4G {
 
 			strcat_s(fullMessage, hrErrorMessage);
 		}
+
+		std::cout << fullMessage;
 
 		return CA4GException(fullMessage);
 	}

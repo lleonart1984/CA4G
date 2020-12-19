@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CA4G_MEMORY_H
+#define CA4G_MEMORY_H
 
 #include "ca4g_errors.h"
 
@@ -7,7 +8,7 @@ namespace CA4G {
 	template<typename S>
 	class gObj {
 		friend S;
-		template<typename T> friend class list; // I dont like it... :(
+		//template<typename T> friend class list; // I dont like it... :(
 		template<typename T> friend class gObj;
 
 	private:
@@ -103,4 +104,28 @@ namespace CA4G {
 			return !isNull();
 		}
 	};
+
+	template<typename S>
+	void gObj<S>::AddReference() {
+		if (!counter)
+			throw new CA4GException("Error referencing");
+
+		InterlockedAdd(counter, 1);
+	}
+
+	template<typename S>
+	void gObj<S>::RemoveReference() {
+		if (!counter)
+			throw new CA4GException("Error referencing");
+
+		InterlockedAdd(counter, -1);
+		if ((*counter) == 0) {
+			delete _this;
+			delete counter;
+			//_this = nullptr;
+			counter = nullptr;
+		}
+	}
 }
+
+#endif

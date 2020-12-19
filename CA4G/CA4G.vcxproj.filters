@@ -33,15 +33,60 @@
     <ClInclude Include="private_ca4g_presenter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ca4g_techniques.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="private_ca4g_definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_resources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_gmath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_imaging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="private_ca4g_sync.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_graphics_process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_dxr_support.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="private_ca4g_descriptors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ca4g_errors.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ca4g_memory.cpp">
+    <ClCompile Include="ca4g_presenter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ca4g_presenter.cpp">
+    <ClCompile Include="ca4g_imaging.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ca4g_resources.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ca4g_techniques.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ca4g_gmath.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ca4g_math.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="private_ca4g_descriptors.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -4,15 +4,14 @@ namespace CA4G {
 	Presenter::Presenter(HWND hWnd):
 		create(new Creating(this)),
 		load(new Loading(this)),
-		set(new Settings(this)),
-		dispatch(new Dispatcher(this)) {
-
-		__internalDXWrapper = new DX_Wrapper();
+		dispatch(new Dispatcher(this)), 
+		set(new Settings(this)) {
+		__InternalDXWrapper = new DX_Wrapper();
 		__InternalState->hWnd = hWnd;
 	}
 
 	Presenter::~Presenter() {
-		delete __internalDXWrapper;
+		delete __InternalDXWrapper;
 	}
 
 	void Presenter::Settings::Buffers(int count) {
@@ -103,18 +102,76 @@ namespace CA4G {
 			&& featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
 	}
 
-
 	void Presenter::Settings::SwapChain() {
+		__PInternalState->Initialize();
+	}
+
+	// uses the presenter to swap buffers and present.
+	void Dispatcher::BackBuffer() {
+		DX_Wrapper* wrapper = (DX_Wrapper*)this->wrapper->__InternalDXWrapper;
+
+		// Wait for all 
+		wrapper->scheduler->FinishFrame();
+
+		auto hr = wrapper->swapChain->Present(0, 0);
+
+		if (hr != S_OK) {
+			HRESULT r = wrapper->device->GetDeviceRemovedReason();
+			throw CA4GException::FromError(CA4G_Errors_Any, nullptr, r);
+		}
+		
+		wrapper->scheduler->SetupFrame(wrapper->swapChain->GetCurrentBackBufferIndex());
+	}
+
+	void Dispatcher::GPUProcess(gObj<IGPUProcess> process) {
+		DX_Wrapper* w = (DX_Wrapper*) wrapper->__InternalDXWrapper;
+		w->scheduler->Enqueue(process);
+	}
+
+	void Dispatcher::GPUProcess_Async(gObj<IGPUProcess> process) {
+		DX_Wrapper* w = (DX_Wrapper*) wrapper->__InternalDXWrapper;
+		w->scheduler->EnqueueAsync(process);
+	}
+
+	static void ChangeStateTo(DX_ResourceWrapper* resource, DX_CommandList cmdList, D3D12_RESOURCE_STATES dst) {
+		if (resource->LastUsageState == dst)
+			return;
+
+		D3D12_RESOURCE_BARRIER barrier = { };
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = resource->resource;
+		barrier.Transition.StateAfter = dst;
+		barrier.Transition.StateBefore = resource->LastUsageState;
+		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		cmdList->ResourceBarrier(1, &barrier);
+		resource->LastUsageState = dst;
+	}
+
+#pragma region Clearing
+
+	void CopyManager::Clearing::RT(gObj<Texture2D> rt, const FLOAT values[4]) {
+		DX_ResourceWrapper* wrapper = (DX_ResourceWrapper*)rt->__InternalDXWrapper;
+		DX_ViewWrapper* view = (DX_ViewWrapper*) rt->__InternalViewWrapper;
+		DX_CommandList cmdList = (ID3D12GraphicsCommandList4*)this->wrapper->__InternalDXCmd;
+		
+		ChangeStateTo(wrapper, cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		cmdList->ClearRenderTargetView(view->getRTVHandle(), values, 0, nullptr);
+	}
+
+#pragma endregion
+
+	void DX_Wrapper::Initialize()
+	{
 		UINT dxgiFactoryFlags = 0;
-		DX_Device device;
 
 #if defined(_DEBUG)
 		// Enable the debug layer (requires the Graphics Tools "optional feature").
 		// NOTE: Enabling the debug layer after device creation will invalidate the active device.
 		{
-			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&__PInternalState->debugController))))
+			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 			{
-				__PInternalState->debugController->EnableDebugLayer();
+				debugController->EnableDebugLayer();
 
 				// Enable additional debug layers.
 				dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
@@ -137,7 +194,7 @@ namespace CA4G {
 		CreateDXGIFactory2(0, IID_PPV_ARGS(&factory));
 #endif
 
-		if (__PInternalState->UseWarpDevice)
+		if (UseWarpDevice)
 		{
 			CComPtr<IDXGIAdapter> warpAdapter;
 			factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
@@ -165,45 +222,142 @@ namespace CA4G {
 		D3D12_FEATURE_DATA_D3D12_OPTIONS ops;
 		device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &ops, sizeof(ops));
 
-		__PInternalState->device = device; // Device created.
-
-		__PInternalState->scheduler = new GPUScheduler(device, __PInternalState->swapChainDesc.BufferCount, 8);
+		scheduler = new GPUScheduler(this, swapChainDesc.BufferCount, 8);
 
 		IDXGISwapChain1* tmpSwapChain;
 
 		factory->CreateSwapChainForHwnd(
-			__PInternalState->scheduler->Engines[0].queue->dxQueue,        // Swap chain needs the queue so that it can force a flush on it.
-			__PInternalState->hWnd,
-			&__PInternalState->swapChainDesc,
-			&__PInternalState->fullScreenDesc,
+			scheduler->Engines[0].queue->dxQueue,        // Swap chain needs the queue so that it can force a flush on it.
+			hWnd,
+			&swapChainDesc,
+			&fullScreenDesc,
 			nullptr,
 			&tmpSwapChain
 		);
 
-		__PInternalState->swapChain = (IDXGISwapChain3*)tmpSwapChain;
-		__PInternalState->swapChain->SetMaximumFrameLatency(__PInternalState->swapChainDesc.BufferCount);
+		swapChain = (IDXGISwapChain3*)tmpSwapChain;
+		swapChain->SetMaximumFrameLatency(swapChainDesc.BufferCount);
 
 		// This sample does not support fullscreen transitions.
-		factory->MakeWindowAssociation(__PInternalState->hWnd, DXGI_MWA_NO_ALT_ENTER);
+		factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
-		//// Create rendertargets resources.
-		//{
-		//	renderTargetViews = new gObj<Texture2D>[buffers];
-		//	// Create a RTV and a command allocator for each frame.
-		//	for (UINT n = 0; n < buffers; n++)
-		//	{
-		//		DX_Resource rtResource;
-		//		swapChain->GetBuffer(n, IID_PPV_ARGS(&rtResource));
+		// Create rendertargets resources.
+		{
+			RenderTargets = new gObj<Texture2D>[swapChainDesc.BufferCount];
+			// Create a RTV and a command allocator for each frame.
+			for (UINT n = 0; n < swapChainDesc.BufferCount; n++)
+			{
+				DX_Resource rtResource;
+				swapChain->GetBuffer(n, IID_PPV_ARGS(&rtResource));
 
-		//		gObj<ResourceWrapper> rtResourceWrapper = new ResourceWrapper(manager, rtResource->GetDesc(), rtResource, D3D12_RESOURCE_STATE_COPY_DEST);
-		//		renderTargetViews[n] = new Texture2D(rtResourceWrapper);
-		//	}
-		//}
+				auto desc = rtResource->GetDesc();
+
+				DX_ResourceWrapper* rw = new DX_ResourceWrapper(this, rtResource, desc, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+				RenderTargets[n] = new Texture2D(rw, nullptr, desc.Format, desc.Width, desc.Height, 1, 1);
+			}
+		}
+
+		// Initialize descriptor heaps
+
+		gui_csu = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 100, 100, 1);
+
+		gpu_csu = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 900000, 1000, swapChainDesc.BufferCount);
+		gpu_smp = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000, 100, swapChainDesc.BufferCount);
+		
+		cpu_rt = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1000);
+		cpu_ds = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1000);
+		cpu_csu = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1000000);
+		cpu_smp = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000);
 
 		//CurrentBuffer = swapChain->GetCurrentBackBufferIndex();
 		//manager->BackBuffer = renderTargetViews[CurrentBuffer];
 
 		//renderTargetDescriptorSlot = manager->descriptors->gui_csu->MallocPersistent();
-
 	}
+
+	Signal GPUScheduler::FlushAndSignal(EngineMask mask) {
+		int engines = (int)mask;
+		long rally[4];
+		// Barrier to wait for all pending workers to populate command lists
+		// After this, next CPU processes can assume previous CPU collecting has finished
+		counting->Wait();
+
+		#pragma region Flush Pending Workers
+
+		int resultMask = 0;
+
+		for (int e = 0; e < 4; e++)
+			if (engines & (1 << e))
+			{
+				int activeCmdLists = 0;
+				for (int t = 0; t < threadsCount; t++) {
+					if (this->Engines[e].threadInfos[t].isActive) // pending work here
+					{
+						this->Engines[e].threadInfos[t].Close();
+						this->ActiveCmdLists[activeCmdLists++] = Engines[e].threadInfos[t].cmdList;
+					}
+					auto manager = Engines[e].threadInfos[t].manager;
+
+					//// Copy all collected descriptors from non-visible to visible DHs.
+					//if (manager->srcDescriptors.size() > 0)
+					//{
+					//	this->manager->device->CopyDescriptors(
+					//		manager->dstDescriptors.size(), &manager->dstDescriptors.first(), &manager->dstDescriptorRangeLengths.first(),
+					//		manager->srcDescriptors.size(), &manager->srcDescriptors.first(), nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+					//	);
+					//	// Clears the lists for next usage
+					//	manager->srcDescriptors.reset();
+					//	manager->dstDescriptors.reset();
+					//	manager->dstDescriptorRangeLengths.reset();
+					//}
+				}
+
+				if (activeCmdLists > 0) // some cmdlist to execute
+				{
+					resultMask |= 1 << e;
+					Engines[e].queue->Commit(ActiveCmdLists, activeCmdLists);
+
+					rally[e] = Engines[e].queue->Signal();
+				}
+				else
+					rally[e] = 0;
+			}
+
+		return Signal(this, rally);
+	}
+
+	void GPUScheduler::WaitFor(const Signal& signal) {
+		int fencesForWaiting = 0;
+		HANDLE FencesForWaiting[4];
+		for (int e = 0; e < 4; e++)
+			if (signal.rallyPoints[e] != 0)
+				FencesForWaiting[fencesForWaiting++] = Engines[e].queue->TriggerEvent(signal.rallyPoints[e]);
+		WaitForMultipleObjects(fencesForWaiting, FencesForWaiting, true, INFINITE);
+	}
+
+	void GPUScheduler::Enqueue(gObj<IGPUProcess> process) {
+		this->PopulateCmdListWithProcess(TagProcess{ process, this->Tag }, 0);
+	}
+
+	void GPUScheduler::EnqueueAsync(gObj<IGPUProcess> process) {
+		counting->Increment();
+		processQueue->TryProduce(TagProcess{ process, this->Tag });
+	}
+
+	DWORD WINAPI GPUScheduler::__WORKER_TODO(LPVOID param) {
+		GPUWorkerInfo* wi = (GPUWorkerInfo*)param;
+		int index = wi->Index;
+		GPUScheduler* scheduler = wi->Scheduler;
+
+		while (!scheduler->IsClosed){
+			TagProcess tagProcess;
+			if (!scheduler->processQueue->TryConsume(tagProcess))
+				break;
+
+			scheduler->PopulateCmdListWithProcess(tagProcess, index);
+		}
+		return 0;
+	}
+
 }

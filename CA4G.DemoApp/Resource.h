@@ -1,17 +1,17 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by CA4G.Test.rc
+// Used by CA4G.DemoApp.rc
 
 #define IDS_APP_TITLE			103
 
 #define IDR_MAINFRAME			128
-#define IDD_CA4GTEST_DIALOG	102
+#define IDD_CA4GDEMOAPP_DIALOG	102
 #define IDD_ABOUTBOX			103
 #define IDM_ABOUT				104
 #define IDM_EXIT				105
-#define IDI_CA4GTEST			107
+#define IDI_CA4GDEMOAPP			107
 #define IDI_SMALL				108
-#define IDC_CA4GTEST			109
+#define IDC_CA4GDEMOAPP			109
 #define IDC_MYICON				2
 #ifndef IDC_STATIC
 #define IDC_STATIC				-1

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CA4G_ERRORS_H
+#define CA4G_ERRORS_H
 
 #include <comdef.h>
 #include <stdexcept>
@@ -32,3 +33,5 @@ namespace CA4G {
 		static CA4GException FromError(CA4G_Errors error, const char* arg = nullptr, HRESULT hr = S_OK);
 	};
 }
+
+#endif
