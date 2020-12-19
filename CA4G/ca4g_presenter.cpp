@@ -48,6 +48,45 @@ namespace CA4G {
 		__PInternalState->UseWarpDevice = useWarpDevice;
 	}
 
+	void ICmdWrapper::__AddBarrier(void* dxresource, D3D12_RESOURCE_STATES dst) {
+		ID3D12GraphicsCommandList5* cmdList = (ID3D12GraphicsCommandList5*)this->__InternalDXCmd;
+		DX_ResourceWrapper* resource = (DX_ResourceWrapper*)dxresource;
+		if (resource->LastUsageState == dst)
+			return;
+
+		D3D12_RESOURCE_BARRIER barrier = { };
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = resource->resource;
+		barrier.Transition.StateAfter = dst;
+		barrier.Transition.StateBefore = resource->LastUsageState;
+		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		cmdList->ResourceBarrier(1, &barrier);
+		resource->LastUsageState = dst;
+	}
+
+	void ICmdWrapper::__AddUAVBarrier(void* dxresource) {
+		ID3D12GraphicsCommandList5* cmdList = (ID3D12GraphicsCommandList5*)this->__InternalDXCmd;
+		DX_ResourceWrapper* resource = (DX_ResourceWrapper*)dxresource;
+		if (resource->LastUsageState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			return;
+
+		D3D12_RESOURCE_BARRIER barrier = { };
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		barrier.UAV.pResource = resource->resource;
+		cmdList->ResourceBarrier(1, &barrier);
+		resource->LastUsageState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+	}
+
+	void ICmdWrapper::__AddBarrier(gObj<ResourceView> resource, D3D12_RESOURCE_STATES dst)
+	{
+		__AddBarrier(resource->__InternalDXWrapper, dst);
+	}
+
+	void ICmdWrapper::__AddUAVBarrier(gObj<ResourceView> resource) {
+		__AddUAVBarrier(resource->__InternalDXWrapper);
+	}
+
 	// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 		// If no such adapter can be found, *ppAdapter will be set to nullptr.
 	_Use_decl_annotations_
@@ -112,7 +151,7 @@ namespace CA4G {
 
 		// Wait for all 
 		wrapper->scheduler->FinishFrame();
-
+		
 		auto hr = wrapper->swapChain->Present(0, 0);
 
 		if (hr != S_OK) {
@@ -133,29 +172,13 @@ namespace CA4G {
 		w->scheduler->EnqueueAsync(process);
 	}
 
-	static void ChangeStateTo(DX_ResourceWrapper* resource, DX_CommandList cmdList, D3D12_RESOURCE_STATES dst) {
-		if (resource->LastUsageState == dst)
-			return;
-
-		D3D12_RESOURCE_BARRIER barrier = { };
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		barrier.Transition.pResource = resource->resource;
-		barrier.Transition.StateAfter = dst;
-		barrier.Transition.StateBefore = resource->LastUsageState;
-		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		cmdList->ResourceBarrier(1, &barrier);
-		resource->LastUsageState = dst;
-	}
-
 #pragma region Clearing
 
-	void CopyManager::Clearing::RT(gObj<Texture2D> rt, const FLOAT values[4]) {
-		DX_ResourceWrapper* wrapper = (DX_ResourceWrapper*)rt->__InternalDXWrapper;
-		DX_ViewWrapper* view = (DX_ViewWrapper*) rt->__InternalViewWrapper;
-		DX_CommandList cmdList = (ID3D12GraphicsCommandList4*)this->wrapper->__InternalDXCmd;
-		
-		ChangeStateTo(wrapper, cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	void GraphicsManager::Clearing::RT(gObj<Texture2D> rt, const FLOAT values[4]) {
+		ID3D12GraphicsCommandList5* cmdList = (ID3D12GraphicsCommandList5*)this->wrapper->__InternalDXCmd;
+		DX_ResourceWrapper* resourceWrapper = (DX_ResourceWrapper*)rt->__InternalDXWrapper;
+		DX_ViewWrapper* view = (DX_ViewWrapper*)rt->__InternalViewWrapper;
+		this->wrapper->__AddBarrier(resourceWrapper, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		cmdList->ClearRenderTargetView(view->getRTVHandle(), values, 0, nullptr);
 	}
 
@@ -252,7 +275,7 @@ namespace CA4G {
 
 				auto desc = rtResource->GetDesc();
 
-				DX_ResourceWrapper* rw = new DX_ResourceWrapper(this, rtResource, desc, D3D12_RESOURCE_STATE_RENDER_TARGET);
+				DX_ResourceWrapper* rw = new DX_ResourceWrapper(this, rtResource, desc, D3D12_RESOURCE_STATE_COPY_DEST);
 
 				RenderTargets[n] = new Texture2D(rw, nullptr, desc.Format, desc.Width, desc.Height, 1, 1);
 			}

@@ -674,8 +674,11 @@ namespace CA4G {
 		}
 
 		void FinishFrame() {
+			// Get current RT
+			auto currentRT = this->dxWrapper->RenderTargets[this->CurrentFrameIndex];
+			// Place a barrier at thread 0 cmdList to Present
+			this->Engines[0].threadInfos[0].manager->__AddBarrier(currentRT, D3D12_RESOURCE_STATE_PRESENT);
 			perFrameFinishedSignal[CurrentFrameIndex] = FlushAndSignal(EngineMask::All);
-
 			if (!dxWrapper->UseFrameBuffering)
 				// Grants the GPU finished working this frame before finishing this frame
 				WaitFor(perFrameFinishedSignal[CurrentFrameIndex]);

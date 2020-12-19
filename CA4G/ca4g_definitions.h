@@ -25,6 +25,7 @@ namespace CA4G {
 	class Texture2D;
 	class Texture3D;
 	struct Signal;
+	class ICmdWrapper;
 	class CommandListManager;
 	class CopyManager;
 	class ComputeManager;

@@ -18,6 +18,8 @@ namespace CA4G {
 	class CommandListManager : public ICmdWrapper {
 		friend GPUScheduler;
 		gObj<TagData> __Tag;
+
+		
 	public:
 		virtual ~CommandListManager() { }
 		// Tag data when the process was enqueue
@@ -38,6 +40,7 @@ namespace CA4G {
 		class Clearing {
 			friend CopyManager;
 
+		protected:
 			ICmdWrapper* wrapper;
 			Clearing(ICmdWrapper* wrapper) :wrapper(wrapper) {}
 		public:
@@ -55,23 +58,6 @@ namespace CA4G {
 			inline void UAV(gObj<ResourceView> uav, const uint4& value) {
 				unsigned int v[4]{ value.x, value.y, value.z, value.w };
 				UAV(uav, v);
-			}
-			void RT(gObj<Texture2D> rt, const FLOAT values[4]);
-			inline void RT(gObj<Texture2D> rt, const float4& value) {
-				float v[4]{ value.x, value.y, value.z, value.w };
-				RT(rt, v);
-			}
-			// Clears the render target accessed by the Texture2D View with a specific float3 value
-			inline void RT(gObj<Texture2D> rt, const float3& value) {
-				float v[4]{ value.x, value.y, value.z, 1.0f };
-				RT(rt, v);
-			}
-			void DepthStencil(gObj<Texture2D> depthStencil, float depth, UINT8 stencil, D3D12_CLEAR_FLAGS flags = D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL);
-			inline void Depth(gObj<Texture2D> depthStencil, float depth = 1.0f) {
-				DepthStencil(depthStencil, depth, 0, D3D12_CLEAR_FLAG_DEPTH);
-			}
-			inline void Stencil(gObj<Texture2D> depthStencil, UINT8 stencil) {
-				DepthStencil(depthStencil, 1, stencil, D3D12_CLEAR_FLAG_STENCIL);
 			}
 		}
 		* const clear;
@@ -198,7 +184,9 @@ namespace CA4G {
 	protected:
 		GraphicsManager() :ComputeManager(),
 			set(new Setter(this)),
-			dispatch(new Dispatcher(this)) {
+			dispatch(new Dispatcher(this)),
+			clear(new Clearing(this))
+		{
 		}
 	public:
 		class Setter {
@@ -219,6 +207,31 @@ namespace CA4G {
 			// Sets an index buffer
 			void IndexBuffer(gObj<Buffer> buffer);
 		}* const set;
+
+		class Clearing : public CopyManager::Clearing {
+			friend GraphicsManager;
+
+			Clearing(ICmdWrapper* wrapper) : CopyManager::Clearing(wrapper) {}
+		public:
+			void RT(gObj<Texture2D> rt, const FLOAT values[4]);
+			inline void RT(gObj<Texture2D> rt, const float4& value) {
+				float v[4]{ value.x, value.y, value.z, value.w };
+				RT(rt, v);
+			}
+			// Clears the render target accessed by the Texture2D View with a specific float3 value
+			inline void RT(gObj<Texture2D> rt, const float3& value) {
+				float v[4]{ value.x, value.y, value.z, 1.0f };
+				RT(rt, v);
+			}
+			void DepthStencil(gObj<Texture2D> depthStencil, float depth, UINT8 stencil, D3D12_CLEAR_FLAGS flags = D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL);
+			inline void Depth(gObj<Texture2D> depthStencil, float depth = 1.0f) {
+				DepthStencil(depthStencil, depth, 0, D3D12_CLEAR_FLAG_DEPTH);
+			}
+			inline void Stencil(gObj<Texture2D> depthStencil, UINT8 stencil) {
+				DepthStencil(depthStencil, 1, stencil, D3D12_CLEAR_FLAG_STENCIL);
+			}
+		}
+		* const clear;
 
 		class Dispatcher {
 			ICmdWrapper* wrapper;

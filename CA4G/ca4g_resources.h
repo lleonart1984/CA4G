@@ -268,9 +268,12 @@ namespace CA4G {
 	};
 
 	class ResourceView {
+		friend ICmdWrapper;
 		friend Technique;
 		friend Creating;
+		friend CommandListManager;
 		friend CopyManager;
+		friend GraphicsManager;
 
 	protected:
 		// Internal object used to wrap a DX resource

@@ -19,7 +19,7 @@ int main(int, char**)
 	gObj<Presenter> presenter = new Presenter(hwnd);
 
 	presenter _set WindowResolution(); // Defines the render target to fit the window resolution
-	//presenter _set UseFrameBuffering(); // Use frame buffering, that means that next frame will be commiting while previous frame is presented.
+	presenter _set UseFrameBuffering(); // Use frame buffering, that means that next frame will be commiting while previous frame is presented.
 	presenter _set Buffers(3); // Number of in fly frames set to 3.
 	presenter _set SwapChain(); // Final set of the presenter to create swap chain and device objects.
 

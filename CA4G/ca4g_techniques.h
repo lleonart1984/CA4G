@@ -25,8 +25,25 @@ namespace CA4G {
 	class ICmdWrapper {
 		friend GPUScheduler;
 		friend CopyManager;
+		friend GraphicsManager;
 	protected:
 		void* __InternalDXCmd;
+
+		// For internal purposes only.
+		// Changes internally the state of a DX resource.
+		void __AddBarrier(void* dxresource, D3D12_RESOURCE_STATES dst);
+
+		// For internal purposes only.
+		// Changes internally the state of a DX resource.
+		void __AddUAVBarrier(void* dxresource);
+
+		// For internal purposes only.
+		// Changes internally the state of a DX resource.
+		void __AddBarrier(gObj<ResourceView> resource, D3D12_RESOURCE_STATES dst);
+
+		// For internal purposes only.
+		// Changes internally the state of a DX resource.
+		void __AddUAVBarrier(gObj<ResourceView> dxresource);
 	};
 
 	class IPipelineBindings {
@@ -66,7 +83,7 @@ namespace CA4G {
 			this->rallyPoints[2] = rallyPoints[2];
 			this->rallyPoints[3] = rallyPoints[3];
 		}
-		long rallyPoints[4];
+		long rallyPoints[4] = { };
 		void* scheduler = nullptr;
 	public:
 		Signal() {}
