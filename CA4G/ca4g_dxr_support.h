@@ -146,6 +146,11 @@ namespace CA4G {
 			return __Library;
 		}
 	};
+
+
+	class RTScene {
+		void* __InternalRTWrapper;
+	};
 }
 
 #endif

@@ -14,16 +14,68 @@
 
 namespace CA4G {
 
+	class Tagging {
+		void* __Tag;
+		int* references;
+	public:
+		template<typename T>
+		Tagging(T data) {
+			__Tag = new T(data);
+			references = new int(1);
+		}
+		
+		Tagging(const Tagging& other) {
+			this->__Tag = other.__Tag;
+			this->references = other.references;
+			if (other.__Tag != nullptr)
+				(*this->references)++;
+		}
+
+		Tagging() {
+			__Tag = nullptr;
+			references = nullptr;
+		}
+
+		~Tagging() {
+			if (__Tag != nullptr) {
+				(*references)--;
+				if (*references == 0)
+					delete __Tag;
+			}
+		}
+
+		Tagging& operator = (const Tagging& other) {
+			if (__Tag != nullptr)
+			{
+				(*references)--;
+				if (*references == 0)
+					delete __Tag;
+			}
+			this->references = other.references;
+			this->__Tag = other.__Tag;
+			if (__Tag != nullptr)
+			{
+				(*references)++;
+			}
+			return *this;
+		}
+
+		template<typename T>
+		T getData() {
+			return *((T*)__Tag);
+		}
+	};
+
 	/// Base type for all types of engines
 	class CommandListManager : public ICmdWrapper {
 		friend GPUScheduler;
-		gObj<TagData> __Tag;
+		Tagging __Tag;
 
-		
 	public:
 		virtual ~CommandListManager() { }
 		// Tag data when the process was enqueue
-		inline gObj<TagData> Tag() { return __Tag; }
+		template<typename T>
+		inline T Tag() { return __Tag.getData<T>(); }
 	};
 
 	class CopyManager : public CommandListManager {
@@ -68,14 +120,25 @@ namespace CA4G {
 
 			ICmdWrapper* wrapper;
 
-			// Data is given by a reference using a pointer
-			void FullCopyToSubresource(gObj<ResourceView> dst, void* data, const D3D12_BOX* box = nullptr);
+			void FastCopyToStart(gObj<ResourceView> dst, byte* data, long size);
 
-			void FullCopyFromSubresource(gObj<ResourceView> dst, void* data, const D3D12_BOX* box = nullptr);
+			void FastCopyFromStart(gObj<ResourceView> dst, byte* data, long size);
+
+			// Data is given by a reference using a pointer
+			void FullCopyToSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box = nullptr);
+
+			void FullCopyFromSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box = nullptr);
 			
 			Copying(ICmdWrapper* wrapper) : wrapper(wrapper) {}
 
 		public:
+
+			// Copies the data from a ptr to the buffer
+			template<typename T>
+			void Ptr(gObj<Buffer> dst, T* data) {
+				FastCopyToStart(dst, data, dst->getSizeInBytes());
+			}
+
 
 			// Copies the data from a ptr to the buffer at specific range
 			template<typename T>
@@ -131,13 +194,13 @@ namespace CA4G {
 			// Data is given by an initializer list
 			template<typename T>
 			void List(gObj<Buffer> dst, std::initializer_list<T> data) {
-				FullCopyToSubresource(dst, data.begin());
+				FastCopyToStart(dst, (byte*)data.begin(), dst->getSizeInBytes());
 			}
 
 			// Data is given expanded in a value object
 			template<typename T>
 			void Value(gObj<Buffer> dst, const T& data) {
-				FullCopyToSubresource(dst, &data);
+				FastCopyToStart(dst, &data);
 			}
 
 			void Resource(gObj<ResourceView> dst, gObj<ResourceView> src);

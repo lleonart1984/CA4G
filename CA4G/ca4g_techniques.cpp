@@ -30,16 +30,16 @@ namespace CA4G {
 		}
 
 		DX_ResourceWrapper* rwrapper = new DX_ResourceWrapper((DX_Wrapper*) this->wrapper->__InternalDXWrapper, resource, desc, initialState);
-
+		rwrapper->elementStride = rwrapper->desc.Format == DXGI_FORMAT_UNKNOWN ? elementWidth : rwrapper->SizeOfFormatElement(rwrapper->desc.Format);
 		switch (desc.Dimension) {
 		case D3D12_RESOURCE_DIMENSION_BUFFER:
-			return new Buffer(wrapper, rwrapper, elementWidth, desc.Width / elementWidth);
+			return new Buffer(rwrapper, nullptr, elementWidth, desc.Width / elementWidth);
 		case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
-			return new Texture1D(wrapper, rwrapper, desc.Format, desc.Width, desc.MipLevels, desc.DepthOrArraySize);
+			return new Texture1D(rwrapper, nullptr, desc.Format, desc.Width, desc.MipLevels, desc.DepthOrArraySize);
 		case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
-			return new Texture2D(wrapper, rwrapper, desc.Format, desc.Width, desc.Height, desc.MipLevels, desc.DepthOrArraySize);
+			return new Texture2D(rwrapper, nullptr, desc.Format, desc.Width, desc.Height, desc.MipLevels, desc.DepthOrArraySize);
 		case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
-			return new Texture3D(wrapper, rwrapper, desc.Format, desc.Width, desc.Height, desc.DepthOrArraySize, desc.MipLevels);
+			return new Texture3D(rwrapper, nullptr, desc.Format, desc.Width, desc.Height, desc.DepthOrArraySize, desc.MipLevels);
 		}
 		return nullptr;
 	}
@@ -231,8 +231,9 @@ namespace CA4G {
 		((GPUScheduler*)this->scheduler)->WaitFor(*this);
 	}
 
-	void Technique::Setting::Tag(gObj<TagData> data)
+	void Technique::Setting::Tag(Tagging data)
 	{
-		((DX_Wrapper*)this->wrapper->__InternalDXWrapper)->scheduler->Tag = data;
+		auto scheduler = ((DX_Wrapper*)this->wrapper->__InternalDXWrapper)->scheduler;
+		scheduler->Tag = data;
 	}
 }

@@ -274,6 +274,8 @@ namespace CA4G {
 		friend CommandListManager;
 		friend CopyManager;
 		friend GraphicsManager;
+		friend DX_Wrapper;
+		friend GPUScheduler;
 
 	protected:
 		// Internal object used to wrap a DX resource
@@ -304,6 +306,7 @@ namespace CA4G {
 		friend Technique;
 		friend ResourceView;
 		friend Creating;
+		friend DX_Wrapper;
 
 	protected:
 		Buffer(
@@ -330,6 +333,7 @@ namespace CA4G {
 		friend Technique;
 		friend ResourceView;
 		friend Creating;
+		friend DX_Wrapper;
 
 	protected:
 		Texture1D(
@@ -412,6 +416,7 @@ namespace CA4G {
 		friend Technique;
 		friend ResourceView;
 		friend Creating;
+		friend DX_Wrapper;
 
 	protected:
 		Texture3D(

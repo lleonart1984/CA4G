@@ -54,13 +54,16 @@
     <ClInclude Include="private_ca4g_sync.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ca4g_graphics_process.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ca4g_dxr_support.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="private_ca4g_descriptors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_pipelines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ca4g_collections.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -87,6 +90,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="private_ca4g_descriptors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ca4g_pipelines.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

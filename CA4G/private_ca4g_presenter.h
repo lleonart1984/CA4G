@@ -5,8 +5,12 @@
 #include "private_ca4g_sync.h"
 #include "ca4g_presenter.h"
 #include "private_ca4g_descriptors.h"
+#include "ca4g_collections.h"
 
 namespace CA4G {
+
+	struct DX_ResourceWrapper;
+	struct DX_ViewWrapper;
 
 	struct GPUScheduler;
 
@@ -75,6 +79,37 @@ namespace CA4G {
 		}
 
 		void Initialize();
+
+		static DX_ResourceWrapper* InternalResource(gObj<ResourceView> view) 
+		{
+			return (DX_ResourceWrapper*)view->__InternalDXWrapper;
+		}
+
+		static DX_ViewWrapper* InternalView(gObj<ResourceView> view)
+		{
+			return (DX_ViewWrapper*)view->__InternalViewWrapper;
+		}
+
+		static gObj<ResourceView> ResolveNullView(D3D12_RESOURCE_DIMENSION dimension) {
+			static gObj<Buffer> nullBuffer = nullptr;
+			static gObj<Texture1D> nullTexture1D = nullptr;
+			static gObj<Texture2D> nullTexture2D = nullptr;
+			static gObj<Texture3D> nullTexture3D = nullptr;
+
+			switch (dimension)
+			{
+			case D3D12_RESOURCE_DIMENSION_BUFFER:
+				return nullBuffer ? nullBuffer : nullBuffer = new Buffer(nullptr, nullptr, 0, 0);
+			case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+				return nullTexture1D ? nullTexture1D : nullTexture1D = new Texture1D(nullptr, nullptr, DXGI_FORMAT_UNKNOWN, 0, 0, 0);
+			case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+				return nullTexture2D ? nullTexture2D : nullTexture2D = new Texture2D(nullptr, nullptr, DXGI_FORMAT_UNKNOWN, 0, 0, 0, 0);
+			case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+				return nullTexture3D ? nullTexture3D : nullTexture3D = new Texture3D(nullptr, nullptr, DXGI_FORMAT_UNKNOWN, 0, 0, 0, 0);
+			default:
+				return nullptr;
+			}
+		}
 	};
 
 	struct DX_ResourceWrapper {
@@ -212,10 +247,13 @@ namespace CA4G {
 		}
 
 		void UploadToSubresource0(long dstOffset, byte* data, long size) {
+			ResolveUploading();
 			memcpy(permanentUploadingMap + dstOffset, (UINT8*)data, size);
 		}
 
 		void DownloadFromSubresource0(long srcOffset, long size, byte* dstData) {
+			ResolveDownloading();
+			
 			mutex.Acquire(); // sync data access to map downloaded version
 
 			D3D12_RANGE range{ srcOffset, size };
@@ -256,6 +294,7 @@ namespace CA4G {
 		}
 
 		void UploadToAllSubresource(byte* data, long size, bool flipRows) {
+			ResolveUploading();
 			int srcOffset = 0;
 			for (UINT i = 0; i < subresources; ++i)
 			{
@@ -269,7 +308,114 @@ namespace CA4G {
 			}
 		}
 
+		int SizeOfFormatElement(DXGI_FORMAT format) {
+			switch (format) {
+			case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+			case DXGI_FORMAT_R32G32B32A32_FLOAT:
+			case DXGI_FORMAT_R32G32B32A32_UINT:
+			case DXGI_FORMAT_R32G32B32A32_SINT:
+				return 128;
+			case DXGI_FORMAT_R32G32B32_TYPELESS:
+			case DXGI_FORMAT_R32G32B32_FLOAT:
+			case DXGI_FORMAT_R32G32B32_UINT:
+			case DXGI_FORMAT_R32G32B32_SINT:
+				return 96;
+			case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+			case DXGI_FORMAT_R16G16B16A16_FLOAT:
+			case DXGI_FORMAT_R16G16B16A16_UNORM:
+			case DXGI_FORMAT_R16G16B16A16_UINT:
+			case DXGI_FORMAT_R16G16B16A16_SNORM:
+			case DXGI_FORMAT_R16G16B16A16_SINT:
+			case DXGI_FORMAT_R32G32_TYPELESS:
+			case DXGI_FORMAT_R32G32_FLOAT:
+			case DXGI_FORMAT_R32G32_UINT:
+			case DXGI_FORMAT_R32G32_SINT:
+			case DXGI_FORMAT_R32G8X24_TYPELESS:
+			case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+			case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+			case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+				return 64;
+			case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+			case DXGI_FORMAT_R10G10B10A2_UNORM:
+			case DXGI_FORMAT_R10G10B10A2_UINT:
+			case DXGI_FORMAT_R11G11B10_FLOAT:
+			case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+			case DXGI_FORMAT_R8G8B8A8_UNORM:
+			case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+			case DXGI_FORMAT_R8G8B8A8_UINT:
+			case DXGI_FORMAT_R8G8B8A8_SNORM:
+			case DXGI_FORMAT_R8G8B8A8_SINT:
+			case DXGI_FORMAT_R16G16_TYPELESS:
+			case DXGI_FORMAT_R16G16_FLOAT:
+			case DXGI_FORMAT_R16G16_UNORM:
+			case DXGI_FORMAT_R16G16_UINT:
+			case DXGI_FORMAT_R16G16_SNORM:
+			case DXGI_FORMAT_R16G16_SINT:
+			case DXGI_FORMAT_R32_TYPELESS:
+			case DXGI_FORMAT_D32_FLOAT:
+			case DXGI_FORMAT_R32_FLOAT:
+			case DXGI_FORMAT_R32_UINT:
+			case DXGI_FORMAT_R32_SINT:
+			case DXGI_FORMAT_R24G8_TYPELESS:
+			case DXGI_FORMAT_D24_UNORM_S8_UINT:
+			case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+			case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+			case DXGI_FORMAT_B8G8R8A8_UNORM:
+			case DXGI_FORMAT_B8G8R8X8_UNORM:
+				return 32;
+			case DXGI_FORMAT_R8G8_TYPELESS:
+			case DXGI_FORMAT_R8G8_UNORM:
+			case DXGI_FORMAT_R8G8_UINT:
+			case DXGI_FORMAT_R8G8_SNORM:
+			case DXGI_FORMAT_R8G8_SINT:
+			case DXGI_FORMAT_R16_TYPELESS:
+			case DXGI_FORMAT_R16_FLOAT:
+			case DXGI_FORMAT_D16_UNORM:
+			case DXGI_FORMAT_R16_UNORM:
+			case DXGI_FORMAT_R16_UINT:
+			case DXGI_FORMAT_R16_SNORM:
+			case DXGI_FORMAT_R16_SINT:
+			case DXGI_FORMAT_B5G6R5_UNORM:
+			case DXGI_FORMAT_B5G5R5A1_UNORM:
+				return 16;
+			case DXGI_FORMAT_R8_TYPELESS:
+			case DXGI_FORMAT_R8_UNORM:
+			case DXGI_FORMAT_R8_UINT:
+			case DXGI_FORMAT_R8_SNORM:
+			case DXGI_FORMAT_R8_SINT:
+			case DXGI_FORMAT_A8_UNORM:
+				return 8;
+			}
+		}
+
+		void UploadRegion(int subresource, byte* data, D3D12_BOX* box = nullptr) {
+			ResolveUploading();
+			
+			D3D12_BOX fullBox{ 0, 0, 0, pLayouts[subresource].Footprint.Width, pLayouts[subresource].Footprint.Height, desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize };
+			
+			if (box == nullptr)
+				box = &fullBox;
+
+			UINT64 bytesPerElement = desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ? 1 : SizeOfFormatElement(this->desc.Format);
+			UINT64 srcRowPitch = (box->right - box->left) * bytesPerElement;
+			UINT64 srcSlicePitch = (box->bottom - box->top) * srcRowPitch;
+
+			UINT64 bytesPerRow = pLayouts[subresource].Footprint.RowPitch;
+			UINT64 bytesPerSlice = pLayouts[subresource].Footprint.Height * bytesPerRow;
+			for (int slice = box->front; slice < box->back; slice++)
+			{
+				byte* dstStartSlicePtr = ((byte*)permanentUploadingMap + pLayouts[subresource].Offset) + slice * bytesPerSlice;
+				const byte* srcStartSlicePtr = ((byte*)data) + slice * srcSlicePitch;
+				for (int row = box->top; row < box->bottom; row++)
+					memcpy(
+						dstStartSlicePtr + row * bytesPerRow + box->left * bytesPerElement,
+						srcStartSlicePtr + row * srcRowPitch, srcRowPitch);
+			}
+		}
+
 		void DownloadFromAllSubresources(byte* data, long size, bool flipRows) {
+			ResolveDownloading();
+			
 			D3D12_RANGE range{ 0, size };
 
 			byte* mappedData;
@@ -304,6 +450,31 @@ namespace CA4G {
 
 		void DownloadFromGPU(DX_CommandList cmd) {
 			cmd->CopyResource(downloading, resource);
+		}
+
+		void AddBarrier(DX_CommandList cmdList, D3D12_RESOURCE_STATES dst) {
+			// If the resource is used as UAV
+			// Put a barrier to finish any pending read/write op
+			if (this->LastUsageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+			{
+				D3D12_RESOURCE_BARRIER barrier = { };
+				barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+				barrier.UAV.pResource = this->resource;
+				cmdList->ResourceBarrier(1, &barrier);
+			}
+			
+			if (this->LastUsageState == dst)
+				return;
+
+			D3D12_RESOURCE_BARRIER barrier = { };
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			barrier.Transition.pResource = this->resource;
+			barrier.Transition.StateAfter = dst;
+			barrier.Transition.StateBefore = this->LastUsageState;
+			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			cmdList->ResourceBarrier(1, &barrier);
+			this->LastUsageState = dst;
 		}
 	};
 
@@ -343,6 +514,14 @@ namespace CA4G {
 		// Mutex object used to synchronize handle creation.
 		Mutex mutex;
 
+		D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandleFor(D3D12_DESCRIPTOR_RANGE_TYPE type) {
+			switch (type) {
+			case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+				return getSRVHandle();
+			}
+			return D3D12_CPU_DESCRIPTOR_HANDLE();
+		}
+
 		#pragma region Creating view handles and caching
 
 		void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC& d)
@@ -352,6 +531,65 @@ namespace CA4G {
 			d.Texture2DArray.MipSlice = mipStart;
 			d.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
 			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
+		void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC& d)
+		{
+			switch (this->ViewDimension) {
+			case D3D12_RESOURCE_DIMENSION_BUFFER:
+				d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				d.Buffer.FirstElement = arrayStart;
+				d.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+				d.Buffer.NumElements = arrayCount;
+				d.Buffer.StructureByteStride = elementStride;
+				d.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+				d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+				d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				d.Texture1DArray.ArraySize = arrayCount;
+				d.Texture1DArray.FirstArraySlice = arrayStart;
+				d.Texture1DArray.MipLevels = mipCount;
+				d.Texture1DArray.MostDetailedMip = mipStart;
+				d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
+				d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+				d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				d.Texture2DArray.ArraySize = arrayCount;
+				d.Texture2DArray.FirstArraySlice = arrayStart;
+				d.Texture2DArray.MipLevels = mipCount;
+				d.Texture2DArray.MostDetailedMip = mipStart;
+				d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+				d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+				d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				d.Texture3D.MipLevels = mipCount;
+				d.Texture3D.MostDetailedMip = mipStart;
+				d.Texture3D.ResourceMinLODClamp = 0;
+				d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+				d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				break;
+			}
+		}
+
+		int getSRV() {
+			if ((handle_mask & 1) != 0)
+				return srv_cached_handle;
+
+			mutex.Acquire();
+			if ((handle_mask & 1) == 0)
+			{
+				D3D12_SHADER_RESOURCE_VIEW_DESC d;
+				ZeroMemory(&d, sizeof(D3D12_SHADER_RESOURCE_VIEW_DESC));
+				CreateSRVDesc(d);
+				srv_cached_handle = resource->dxWrapper->cpu_csu->AllocateNewHandle();
+				resource->dxWrapper->device->CreateShaderResourceView(!resource ? nullptr : resource->resource, &d, resource->dxWrapper->cpu_csu->getCPUVersion(srv_cached_handle));
+				handle_mask |= 1;
+			}
+			mutex.Release();
+			return srv_cached_handle;
 		}
 
 		int getRTV() {
@@ -375,6 +613,10 @@ namespace CA4G {
 
 		D3D12_CPU_DESCRIPTOR_HANDLE getRTVHandle() {
 			return resource->dxWrapper->cpu_rt->getCPUVersion(getRTV());
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getSRVHandle() {
+			return resource->dxWrapper->cpu_csu->getCPUVersion(getSRV());
 		}
 
 		#pragma endregion
@@ -411,6 +653,13 @@ namespace CA4G {
 
 			return result;
 		}
+	};
+
+	struct DX_CmdWrapper {
+		DX_CommandList cmdList = nullptr;
+		list<D3D12_CPU_DESCRIPTOR_HANDLE> srcDescriptors = {};
+		list<D3D12_CPU_DESCRIPTOR_HANDLE> dstDescriptors = {};
+		list<unsigned int> dstDescriptorRangeLengths = {};
 	};
 
 	#pragma region Command Queue Manager
@@ -510,7 +759,7 @@ namespace CA4G {
 	// Used for defered command list population in async mode.
 	struct TagProcess {
 		gObj<IGPUProcess> process;
-		gObj<TagData> Tag;
+		Tagging Tag;
 	};
 
 	// This class is intended to manage all command queues, threads, allocators and command lists
@@ -541,7 +790,11 @@ namespace CA4G {
 		int CurrentFrameIndex = 0;
 
 		// Tag data will be associated to any command list manager for a process in the time they are enqueue
-		gObj<TagData> Tag = nullptr;
+		Tagging Tag;
+		
+		// Gets whenever there is an async cmd list pendent.
+		// This is used to know when to force a flush before changing render state at cmd list 0 to Present
+		bool AsyncWorkPending = false;
 
 		// Array to collect active cmd lists during flushing.
 		// This array needs capacity to store a cmd list x thread x engine type.
@@ -633,7 +886,9 @@ namespace CA4G {
 						break;
 					}
 
-					info.threadInfos[j].manager->__InternalDXCmd = info.threadInfos[j].cmdList;
+					DX_CmdWrapper* cmdWrapper = new DX_CmdWrapper();
+					cmdWrapper->cmdList = info.threadInfos[j].cmdList;
+					info.threadInfos[j].manager->__InternalDXCmdWrapper = cmdWrapper;
 				}
 			}
 		}
@@ -671,13 +926,27 @@ namespace CA4G {
 
 			for (int e = 0; e < 4; e++)
 				Engines[e].frames[frame].ResetUsedAllocators();
+
+			// Get current RT
+			auto currentRT = this->dxWrapper->RenderTargets[this->CurrentFrameIndex];
+			DX_ResourceWrapper* rtWrapper = (DX_ResourceWrapper*) currentRT->__InternalDXWrapper;
+			
+			// Place a barrier at thread 0 cmdList to Present
+			rtWrapper->AddBarrier(this->Engines[0].threadInfos[0].cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}
 
 		void FinishFrame() {
+			if (this->AsyncWorkPending)
+				// Ensure all async work was done before.
+				FlushAndSignal(EngineMask::All).WaitFor();
+
 			// Get current RT
 			auto currentRT = this->dxWrapper->RenderTargets[this->CurrentFrameIndex];
+
 			// Place a barrier at thread 0 cmdList to Present
-			this->Engines[0].threadInfos[0].manager->__AddBarrier(currentRT, D3D12_RESOURCE_STATE_PRESENT);
+			DX_ResourceWrapper* rtWrapper = (DX_ResourceWrapper*) currentRT->__InternalDXWrapper;
+			rtWrapper->AddBarrier(this->Engines[0].threadInfos[0].cmdList, D3D12_RESOURCE_STATE_PRESENT);
+
 			perFrameFinishedSignal[CurrentFrameIndex] = FlushAndSignal(EngineMask::All);
 			if (!dxWrapper->UseFrameBuffering)
 				// Grants the GPU finished working this frame before finishing this frame

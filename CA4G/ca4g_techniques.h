@@ -13,6 +13,7 @@ namespace CA4G {
 		friend Loading;
 		friend Dispatcher;
 		friend Signal;
+		template<typename ...PSS> friend class StaticPipelineBindings;
 	protected:
 		void* __InternalDXWrapper;
 
@@ -26,31 +27,9 @@ namespace CA4G {
 		friend GPUScheduler;
 		friend CopyManager;
 		friend GraphicsManager;
+		template<typename ...PSS> friend class StaticPipelineBindings;
 	protected:
-		void* __InternalDXCmd;
-
-		// For internal purposes only.
-		// Changes internally the state of a DX resource.
-		void __AddBarrier(void* dxresource, D3D12_RESOURCE_STATES dst);
-
-		// For internal purposes only.
-		// Changes internally the state of a DX resource.
-		void __AddUAVBarrier(void* dxresource);
-
-		// For internal purposes only.
-		// Changes internally the state of a DX resource.
-		void __AddBarrier(gObj<ResourceView> resource, D3D12_RESOURCE_STATES dst);
-
-		// For internal purposes only.
-		// Changes internally the state of a DX resource.
-		void __AddUAVBarrier(gObj<ResourceView> dxresource);
-	};
-
-	class IPipelineBindings {
-	protected:
-		void OnLoad(IDXWrapper* dxWrapper);
-		void OnSet(ICmdWrapper* cmdWrapper);
-		void OnDispatch(ICmdWrapper* cmdWrapper);
+		void* __InternalDXCmdWrapper;
 	};
 
 	// Represents the different engines can be used to work with the GPU.
@@ -63,6 +42,14 @@ namespace CA4G {
 		Copy = 2,
 		// Engine used for ray-tracing programs using libraries. (This engine uses the same queue that graphics).
 		Raytracing = 3
+	};
+
+	class IPipelineBindings {
+	protected:
+		virtual Engine GetEngine() = 0;
+		virtual void OnLoad(IDXWrapper* dxWrapper) = 0;
+		virtual void OnSet(ICmdWrapper* cmdWrapper) = 0;
+		virtual void OnDispatch(ICmdWrapper* cmdWrapper) = 0;
 	};
 
 	enum class EngineMask : int {
@@ -78,6 +65,7 @@ namespace CA4G {
 		friend GPUScheduler;
 	private:
 		Signal(void* scheduler, long rallyPoints[4]) {
+			this->scheduler = scheduler;
 			this->rallyPoints[0] = rallyPoints[0];
 			this->rallyPoints[1] = rallyPoints[1];
 			this->rallyPoints[2] = rallyPoints[2];
@@ -88,11 +76,6 @@ namespace CA4G {
 	public:
 		Signal() {}
 		void WaitFor();
-	};
-
-	struct TagData {
-		TagData() {}
-		virtual ~TagData() {}
 	};
 
 	class Technique : public IDXWrapper {
@@ -117,8 +100,14 @@ namespace CA4G {
 			friend Technique;
 			IDXWrapper* wrapper;
 			Setting(IDXWrapper* wrapper) :wrapper(wrapper) {}
+			
+			void Tag(Tagging data);
+
 		public:
-			void Tag(gObj<TagData> data);
+			template<typename T>
+			void TagValue(const T& data) {
+				Tag(Tagging(data));
+			}
 		}* const set;
 	
 		virtual void OnLoad() = 0;
@@ -148,7 +137,7 @@ namespace CA4G {
 		template<typename T, typename... A>
 		gObj<T> TechniqueObj(A... args);
 
-		Signal FlushAndSignal(EngineMask mask);
+		Signal FlushAndSignal(EngineMask mask = EngineMask::All);
 
 #pragma region Creating resources
 
@@ -186,7 +175,7 @@ namespace CA4G {
 		gObj<Buffer> Buffer_IB(int elementStride, int count);
 		// Creates a buffer to be binded as an index buffer.
 		template <typename T>
-		gObj<Buffer> Buffer_IB(int count = 1) {
+		gObj<Buffer> Buffer_IB(int count) {
 			throw new CA4GException("Error in type");
 		}
 

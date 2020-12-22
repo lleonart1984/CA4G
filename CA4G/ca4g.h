@@ -5,6 +5,7 @@
 //#include "ca4g_resources.h"
 #include "ca4g_presenter.h"
 
+
 #pragma region DSL commands
 
 #define _set ->set->
@@ -12,6 +13,7 @@
 #define _load ->load->
 #define _create ->create->
 #define _dispatch ->dispatch->
+#define _copy ->copy->
 
 #define __set this _set
 #define __clear this _clear

@@ -48,45 +48,6 @@ namespace CA4G {
 		__PInternalState->UseWarpDevice = useWarpDevice;
 	}
 
-	void ICmdWrapper::__AddBarrier(void* dxresource, D3D12_RESOURCE_STATES dst) {
-		ID3D12GraphicsCommandList5* cmdList = (ID3D12GraphicsCommandList5*)this->__InternalDXCmd;
-		DX_ResourceWrapper* resource = (DX_ResourceWrapper*)dxresource;
-		if (resource->LastUsageState == dst)
-			return;
-
-		D3D12_RESOURCE_BARRIER barrier = { };
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		barrier.Transition.pResource = resource->resource;
-		barrier.Transition.StateAfter = dst;
-		barrier.Transition.StateBefore = resource->LastUsageState;
-		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		cmdList->ResourceBarrier(1, &barrier);
-		resource->LastUsageState = dst;
-	}
-
-	void ICmdWrapper::__AddUAVBarrier(void* dxresource) {
-		ID3D12GraphicsCommandList5* cmdList = (ID3D12GraphicsCommandList5*)this->__InternalDXCmd;
-		DX_ResourceWrapper* resource = (DX_ResourceWrapper*)dxresource;
-		if (resource->LastUsageState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-			return;
-
-		D3D12_RESOURCE_BARRIER barrier = { };
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-		barrier.UAV.pResource = resource->resource;
-		cmdList->ResourceBarrier(1, &barrier);
-		resource->LastUsageState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-	}
-
-	void ICmdWrapper::__AddBarrier(gObj<ResourceView> resource, D3D12_RESOURCE_STATES dst)
-	{
-		__AddBarrier(resource->__InternalDXWrapper, dst);
-	}
-
-	void ICmdWrapper::__AddUAVBarrier(gObj<ResourceView> resource) {
-		__AddUAVBarrier(resource->__InternalDXWrapper);
-	}
-
 	// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 		// If no such adapter can be found, *ppAdapter will be set to nullptr.
 	_Use_decl_annotations_
@@ -175,11 +136,40 @@ namespace CA4G {
 #pragma region Clearing
 
 	void GraphicsManager::Clearing::RT(gObj<Texture2D> rt, const FLOAT values[4]) {
-		ID3D12GraphicsCommandList5* cmdList = (ID3D12GraphicsCommandList5*)this->wrapper->__InternalDXCmd;
+		auto cmdList = ((DX_CmdWrapper*) this->wrapper->__InternalDXCmdWrapper)->cmdList;
 		DX_ResourceWrapper* resourceWrapper = (DX_ResourceWrapper*)rt->__InternalDXWrapper;
 		DX_ViewWrapper* view = (DX_ViewWrapper*)rt->__InternalViewWrapper;
-		this->wrapper->__AddBarrier(resourceWrapper, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		resourceWrapper->AddBarrier(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		cmdList->ClearRenderTargetView(view->getRTVHandle(), values, 0, nullptr);
+	}
+
+#pragma endregion
+
+#pragma region Copying
+
+	void CopyManager::Copying::FastCopyToStart(gObj<ResourceView> dst, byte* data, long size) {
+		auto resource = (DX_ResourceWrapper*)dst->__InternalDXWrapper;
+		auto view = (DX_ViewWrapper*)dst->__InternalViewWrapper;
+		if (view->ViewDimension != resource->desc.Dimension)
+			throw new CA4G::CA4GException("Can not update cast version of a resource");
+		int subresource = resource->desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ?
+			view->mipStart :
+			view->mipStart + (view->arrayStart * resource->desc.MipLevels);
+		resource->UploadToSubresource0(resource->pLayouts[subresource].Offset, (byte*)data, size);
+		resource->UploadToGPU(((DX_CmdWrapper*)this->wrapper->__InternalDXCmdWrapper)->cmdList);
+	}
+
+	void CopyManager::Copying::FullCopyToSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box)
+	{
+		auto resource = (DX_ResourceWrapper*)dst->__InternalDXWrapper;
+		
+		if (box != nullptr) // region inside subresource
+		{ // Only copy region
+			
+		}
+		else { // copy all subresources of the view/slice
+
+		}
 	}
 
 #pragma endregion
@@ -357,6 +347,8 @@ namespace CA4G {
 			if (signal.rallyPoints[e] != 0)
 				FencesForWaiting[fencesForWaiting++] = Engines[e].queue->TriggerEvent(signal.rallyPoints[e]);
 		WaitForMultipleObjects(fencesForWaiting, FencesForWaiting, true, INFINITE);
+		if (signal.rallyPoints[0] != 0 || signal.rallyPoints[3] != 0)
+			this->AsyncWorkPending = false;
 	}
 
 	void GPUScheduler::Enqueue(gObj<IGPUProcess> process) {
@@ -364,6 +356,7 @@ namespace CA4G {
 	}
 
 	void GPUScheduler::EnqueueAsync(gObj<IGPUProcess> process) {
+		this->AsyncWorkPending |= process->RequiredEngine() == Engine::Direct || process->RequiredEngine() == Engine::Raytracing;
 		counting->Increment();
 		processQueue->TryProduce(TagProcess{ process, this->Tag });
 	}

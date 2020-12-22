@@ -31,6 +31,8 @@ int main(int, char**)
 
 	presenter _load TechniqueObj(technique);
 
+	presenter _create FlushAndSignal().WaitFor();
+
 	// Main loop
 	MSG msg;
 	ZeroMemory(&msg, sizeof(msg));

@@ -7,6 +7,11 @@ namespace CA4G {
 		__InternalViewWrapper(internalViewWrapper) {
 		((DX_ResourceWrapper*)this->__InternalDXWrapper)->references++;
 
+		if (internalDXWrapper == nullptr) {
+			// Resource View used for Null Descriptors
+			return;
+		}
+
 		if (this->__InternalViewWrapper == nullptr) {
 			// Get default view from resource description
 			auto desc = ((DX_ResourceWrapper*)this->__InternalDXWrapper)->desc;
