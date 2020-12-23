@@ -5,18 +5,14 @@ namespace CA4G {
 	ResourceView::ResourceView(DX_ResourceWrapper* internalDXWrapper, DX_ViewWrapper* internalViewWrapper)
 		: __InternalDXWrapper(internalDXWrapper),
 		__InternalViewWrapper(internalViewWrapper) {
-		((DX_ResourceWrapper*)this->__InternalDXWrapper)->references++;
 
-		if (internalDXWrapper == nullptr) {
-			// Resource View used for Null Descriptors
-			return;
-		}
-
-		if (this->__InternalViewWrapper == nullptr) {
+		DX_ViewWrapper* view = internalViewWrapper ? internalViewWrapper : new DX_ViewWrapper(internalDXWrapper);
+		__InternalViewWrapper = view;
+		(__InternalDXWrapper)->references++;
+		if (internalViewWrapper == nullptr) { // Get view slice info from original resource description
 			// Get default view from resource description
-			auto desc = ((DX_ResourceWrapper*)this->__InternalDXWrapper)->desc;
-			DX_ViewWrapper* view = new DX_ViewWrapper((DX_ResourceWrapper*)internalDXWrapper);
-			view->elementStride = ((DX_ResourceWrapper*)this->__InternalDXWrapper)->elementStride;
+			auto desc = __InternalDXWrapper->desc;
+			view->elementStride = __InternalDXWrapper->elementStride;
 			view->arrayStart = 0;
 			view->arrayCount = desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ?
 				this->getSizeInBytes() / view->elementStride :
@@ -24,9 +20,21 @@ namespace CA4G {
 			view->mipStart = 0;
 			view->mipCount = desc.MipLevels;
 			view->ViewDimension = desc.Dimension;
-
-			this->__InternalViewWrapper = view;
 		}
+	}
+
+	gObj<ResourceView> CA4G::ResourceView::CreateNullView(DX_Wrapper* deviceManager, D3D12_RESOURCE_DIMENSION dimension)
+	{
+		D3D12_RESOURCE_DESC nullDesc = {
+		};
+		nullDesc.Dimension = dimension;
+		DX_ResourceWrapper* nullresource = new DX_ResourceWrapper(deviceManager, nullptr, nullDesc, D3D12_RESOURCE_STATE_GENERIC_READ, CPUAccessibility::None);
+		DX_ViewWrapper* nullview = new DX_ViewWrapper(nullresource);
+		nullview->arrayCount = 1;
+		nullview->mipCount = 1;
+		nullview->elementStride = 1;
+		nullview->ViewDimension = dimension;
+		return new ResourceView(nullresource, nullview);
 	}
 
 	ResourceView::~ResourceView() {
@@ -44,67 +52,16 @@ namespace CA4G {
 		return __InternalResourceState->pTotalSizes;
 	}
 
-	gObj<Buffer> ResourceView::AsBuffer(int elementWidth) {
-		DX_ViewWrapper* wrapper = new DX_ViewWrapper(((DX_ViewWrapper*) this->__InternalViewWrapper)->resource);
-		wrapper->arrayCount = this->getSizeInBytes() / elementWidth;
-		wrapper->arrayStart = 0;
-		wrapper->mipStart = 0;
-		wrapper->mipCount = 1;
-		wrapper->elementStride = elementWidth;
-		wrapper->ViewDimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	CPUAccessibility ResourceView::getCPUAccessibility() {
+		return __InternalResourceState->cpuaccess;
+	}
+
+	gObj<Buffer> Buffer::Creating::Slice(int startElement, int count) {
 		return new Buffer(
-			this->__InternalDXWrapper,
-			wrapper,
-			elementWidth,
-			this->getSizeInBytes() / elementWidth);
-	}
-
-	gObj<Texture1D> ResourceView::AsTexture1D(DXGI_FORMAT format, int width, int mips, int arrayLength)
-	{
-		DX_ViewWrapper* wrapper = new DX_ViewWrapper(((DX_ViewWrapper*)this->__InternalViewWrapper)->resource);
-		wrapper->arrayCount = arrayLength;
-		wrapper->arrayStart = 0;
-		wrapper->mipStart = 0;
-		wrapper->mipCount = mips;
-		wrapper->ViewDimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
-		return new Texture1D(
-			this->__InternalDXWrapper,
-			wrapper,
-			format, width, mips, arrayLength);
-	}
-
-	gObj<Texture2D> ResourceView::AsTexture2D(DXGI_FORMAT format, int width, int height, int mips, int arrayLength) {
-		DX_ViewWrapper* wrapper = new DX_ViewWrapper(((DX_ViewWrapper*)this->__InternalViewWrapper)->resource);
-		wrapper->arrayCount = arrayLength;
-		wrapper->arrayStart = 0;
-		wrapper->mipStart = 0;
-		wrapper->mipCount = mips;
-		wrapper->ViewDimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		return new Texture2D(
-			this->__InternalDXWrapper,
-			wrapper,
-			format, width, height, mips, arrayLength);
-	}
-
-	gObj<Texture3D> ResourceView::AsTexture3D(DXGI_FORMAT format, int width, int height, int depth, int mips) {
-		DX_ViewWrapper* wrapper = new DX_ViewWrapper(((DX_ViewWrapper*)this->__InternalViewWrapper)->resource);
-		wrapper->arrayCount = depth;
-		wrapper->arrayStart = 0;
-		wrapper->mipStart = 0;
-		wrapper->mipCount = mips;
-		wrapper->ViewDimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-		return new Texture3D(
-			this->__InternalDXWrapper,
-			wrapper,
-			format, width, height, depth, mips);
-	}
-
-	gObj<Buffer> Buffer::Slice(int startElement, int count) {
-		return new Buffer(
-			this->__InternalDXWrapper,
-			((DX_ViewWrapper*)this->__InternalViewWrapper)->
+			buffer->__InternalDXWrapper,
+			((DX_ViewWrapper*)buffer->__InternalViewWrapper)->
 				createSlicedClone(0, 0, startElement, count),
-			this->Stride, count);
+			buffer->Stride, count);
 	}
 
 	gObj<Texture1D> Texture1D::SliceMips(int start, int count) {

@@ -8858,7 +8858,7 @@ namespace CA4G {
 	public:
 		GraphicsBinder();
 
-		class Setting : ComputeBinder::Setting {
+		class Setting : public ComputeBinder::Setting {
 			friend GraphicsBinder;
 			Setting(GraphicsBinder* binder): ComputeBinder::Setting(binder){}
 
@@ -8903,7 +8903,7 @@ namespace CA4G {
 	class RaytracingBinder : public ComputeBinder {
 	public:
 		RaytracingBinder();
-		class Setting : ComputeBinder::Setting {
+		class Setting : public ComputeBinder::Setting {
 			friend RaytracingBinder;
 			Setting(RaytracingBinder* binder) : ComputeBinder::Setting(binder) {}
 			void AddADS(int slot, void* resource);

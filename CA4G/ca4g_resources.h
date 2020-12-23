@@ -163,6 +163,19 @@ namespace CA4G {
 
 #pragma endregion
 
+	enum class CPUAccessibility {
+		// The resource can not be read or write directly from the CPU.
+		// A stagging internal version is used for so.
+		// This grant an optimized use of the GPU access. It is the most common usage for resources.
+		None,
+		// The resource can be written fast by the CPU and the GPU can read moderatly.
+		// Can be used for dynamic constant buffers that requires update every frame.
+		Write,
+		// The resource can be read fast by the CPU and the GPU can write moderately.
+		// Only use in case of a every-frame data required to be drawback from the GPU
+		Read
+	};
+
 	// Represents a sampler object
 	struct Sampler {
 		D3D12_FILTER Filter;
@@ -286,18 +299,14 @@ namespace CA4G {
 		ResourceView(DX_ResourceWrapper* internalDXWrapper, DX_ViewWrapper* internalViewWrapper);
 
 	public:
+		static gObj<ResourceView> CreateNullView(DX_Wrapper* deviceManager, D3D12_RESOURCE_DIMENSION dimension);
+
 		void SetDebugName(LPCWSTR name);
+
+		CPUAccessibility getCPUAccessibility();
 
 		// Gets the total size in bytes this resource (or subresource) requires
 		long getSizeInBytes();
-
-		gObj<Buffer> AsBuffer(int elementWidth);
-
-		gObj<Texture1D> AsTexture1D(DXGI_FORMAT format, int width, int mips, int arrayLength);
-
-		gObj<Texture2D> AsTexture2D(DXGI_FORMAT format, int width, int height, int mips, int arrayLength);
-
-		gObj<Texture3D> AsTexture3D(DXGI_FORMAT format, int width, int height, int depth, int mips);
 
 		virtual ~ResourceView();
 	};
@@ -316,7 +325,8 @@ namespace CA4G {
 			int elementCount) : 
 			ResourceView(internalDXWrapper, internalViewWrapper),
 			ElementCount(elementCount), 
-			Stride(stride) {
+			Stride(stride),
+			create(new Creating(this)){
 		}
 	public:
 		// Number of elements of this buffer
@@ -326,7 +336,14 @@ namespace CA4G {
 		unsigned int const
 			Stride;
 
-		gObj<Buffer> Slice(int startElement, int count);
+		class Creating {
+			friend Buffer;
+			Buffer* buffer;
+			Creating(Buffer* buffer) :buffer(buffer) {}
+		public:
+			gObj<Buffer> Slice(int startElement, int count);
+		} * const create;
+
 	};
 
 	class Texture1D : public ResourceView {

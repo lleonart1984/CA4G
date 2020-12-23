@@ -136,7 +136,7 @@ namespace CA4G {
 #pragma region DX_Wrapper
 
 	D3D12_CPU_DESCRIPTOR_HANDLE DX_Wrapper::ResolveNullRTVDescriptor() {
-		return ResolveNullView(D3D12_RESOURCE_DIMENSION_TEXTURE2D)->__InternalViewWrapper->getRTVHandle();
+		return ResolveNullView(this, D3D12_RESOURCE_DIMENSION_TEXTURE2D)->__InternalViewWrapper->getRTVHandle();
 	}
 
 
@@ -160,13 +160,11 @@ namespace CA4G {
 	void CopyManager::Copying::FastCopyToStart(gObj<ResourceView> dst, byte* data, long size) {
 		auto resource = (DX_ResourceWrapper*)dst->__InternalDXWrapper;
 		auto view = (DX_ViewWrapper*)dst->__InternalViewWrapper;
-		if (view->ViewDimension != resource->desc.Dimension)
-			throw new CA4G::CA4GException("Can not update cast version of a resource");
 		int subresource = resource->desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ?
 			view->mipStart :
 			view->mipStart + (view->arrayStart * resource->desc.MipLevels);
 		resource->UploadToSubresource0(resource->pLayouts[subresource].Offset, (byte*)data, size);
-		resource->UploadToGPU(((DX_CmdWrapper*)this->wrapper->__InternalDXCmdWrapper)->cmdList);
+		resource->GrantGPUAccess(((DX_CmdWrapper*)this->wrapper->__InternalDXCmdWrapper)->cmdList);
 	}
 
 	void CopyManager::Copying::FullCopyToSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box)
@@ -218,6 +216,9 @@ namespace CA4G {
 		D3D12_VERTEX_BUFFER_VIEW view;
 		buffer->__InternalViewWrapper->CreateVBV(view);
 		wrapper->__InternalDXCmdWrapper->cmdList->IASetVertexBuffers(slot, 1, &view);
+		if (slot == 0) {
+			wrapper->__InternalDXCmdWrapper->vertexBufferSliceOffset = buffer->__InternalViewWrapper->arrayStart;
+		}
 	}
 
 	void CA4G::GraphicsManager::Setter::IndexBuffer(gObj<Buffer> buffer)
@@ -226,6 +227,7 @@ namespace CA4G {
 		D3D12_INDEX_BUFFER_VIEW view;
 		buffer->__InternalViewWrapper->CreateIBV(view);
 		wrapper->__InternalDXCmdWrapper->cmdList->IASetIndexBuffer(&view);
+		wrapper->__InternalDXCmdWrapper->indexBufferSliceOffset = buffer->__InternalViewWrapper->arrayStart;
 	}
 
 	void CA4G::GraphicsManager::Dispatcher::IndexedPrimitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start)
@@ -237,7 +239,7 @@ namespace CA4G {
 		}
 		cmdWrapper->currentPipeline->OnDispatch(this->wrapper);
 		cmdWrapper->cmdList->IASetPrimitiveTopology(topology);
-		cmdWrapper->cmdList->DrawIndexedInstanced(count, 1, start, 0, 0);
+		cmdWrapper->cmdList->DrawIndexedInstanced(count, 1, start + cmdWrapper->indexBufferSliceOffset, cmdWrapper->vertexBufferSliceOffset, 0);
 	}
 
 	void CA4G::GraphicsManager::Dispatcher::Primitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start)
@@ -249,7 +251,7 @@ namespace CA4G {
 		}
 		cmdWrapper->currentPipeline->OnDispatch(this->wrapper);
 		cmdWrapper->cmdList->IASetPrimitiveTopology(topology);
-		cmdWrapper->cmdList->DrawInstanced(count, 1, start, 0);
+		cmdWrapper->cmdList->DrawInstanced(count, 1, start + cmdWrapper->vertexBufferSliceOffset, 0);
 	}
 
 #pragma endregion
@@ -345,7 +347,7 @@ namespace CA4G {
 
 				auto desc = rtResource->GetDesc();
 
-				DX_ResourceWrapper* rw = new DX_ResourceWrapper(this, rtResource, desc, D3D12_RESOURCE_STATE_COPY_DEST);
+				DX_ResourceWrapper* rw = new DX_ResourceWrapper(this, rtResource, desc, D3D12_RESOURCE_STATE_COPY_DEST, CPUAccessibility::None);
 
 				RenderTargets[n] = new Texture2D(rw, nullptr, desc.Format, desc.Width, desc.Height, 1, 1);
 			}

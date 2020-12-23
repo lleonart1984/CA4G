@@ -1,4 +1,8 @@
-float4 main() : SV_TARGET
+Texture2D<float4> tex : register(t0);
+
+sampler smp : register(s0);
+
+float4 main(float4 pos : SV_POSITION) : SV_TARGET
 {
-	return float4(1.0f, 1.0f, 0.5f, 1.0f);
+	return tex.Sample(smp, pos.xy);
 }

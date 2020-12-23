@@ -73,7 +73,7 @@ namespace CA4G {
 				{
 					for (int i = 0; i < RenderTargetMax; i++)
 						if (!(*RenderTargets[i]))
-							RenderTargetDescriptors[i] = DX_Wrapper::ResolveNullRTVDescriptor();
+							RenderTargetDescriptors[i] = dxwrapper->ResolveNullRTVDescriptor();
 						else
 						{
 							DX_ResourceWrapper* iresource = DX_Wrapper::InternalResource(*RenderTargets[i]);
@@ -139,7 +139,7 @@ namespace CA4G {
 
 						if (!resource)
 							// Grant a resource view to create null descriptor if missing resource.
-							resource = DX_Wrapper::ResolveNullView(binding.DescriptorData.Dimension);
+							resource = dxwrapper->ResolveNullView(dxwrapper, binding.DescriptorData.Dimension);
 						else
 						{
 							switch (binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType)
@@ -237,6 +237,95 @@ namespace CA4G {
 
 	RaytracingBinder::RaytracingBinder(): ComputeBinder(), set(new Setting(this)) {
 		((InternalBindings*)__InternalBindingObject)->EngineType = Engine::Raytracing;
+	}
+
+	void CA4G::ComputeBinder::Setting::AddConstant(int slot, void* data, int size)
+	{
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		p.Constants.Num32BitValues = size;
+		p.Constants.RegisterSpace = space;
+		p.Constants.ShaderRegister = slot;
+		p.ShaderVisibility = visibility;
+
+		SlotBinding b{  };
+		b.Root_Parameter = p;
+		b.ConstantData.ptrToConstant = (void*)&data;
+		((InternalBindings*)binder->__InternalBindingObject)->__CSU.add(b);
+	}
+	
+	void CA4G::ComputeBinder::Setting::AddDescriptorRange(int slot, D3D12_DESCRIPTOR_RANGE_TYPE type, void* resource)
+	{
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		p.DescriptorTable.NumDescriptorRanges = 1;
+		p.ShaderVisibility = visibility;
+
+		D3D12_DESCRIPTOR_RANGE range = { };
+		range.BaseShaderRegister = slot;
+		range.NumDescriptors = 1;
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		range.RangeType = type;
+		range.RegisterSpace = space;
+
+		((InternalBindings*)binder->__InternalBindingObject)->ranges.add(range);
+		p.DescriptorTable.pDescriptorRanges = &((InternalBindings*)binder->__InternalBindingObject)->ranges.last();
+
+		SlotBinding b{  };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		b.DescriptorData.ptrToResourceViewArray = resource;
+		((InternalBindings*)binder->__InternalBindingObject)->__CSU.add(b);
+	}
+
+	void CA4G::ComputeBinder::Setting::AddDescriptorRange(int initialSlot, D3D12_DESCRIPTOR_RANGE_TYPE type, void* resourceArray, int* count)
+	{
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		p.DescriptorTable.NumDescriptorRanges = 1;
+		p.ShaderVisibility = visibility;
+		D3D12_DESCRIPTOR_RANGE range = { };
+		range.BaseShaderRegister = initialSlot;
+		range.NumDescriptors = -1;// undefined this moment
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		range.RangeType = type;
+		range.RegisterSpace = space;
+
+		((InternalBindings*)binder->__InternalBindingObject)->ranges.add(range);
+		p.DescriptorTable.pDescriptorRanges = &((InternalBindings*)binder->__InternalBindingObject)->ranges.last();
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		b.DescriptorData.ptrToResourceViewArray = resourceArray;
+		b.DescriptorData.ptrToCount = count;
+		((InternalBindings*)binder->__InternalBindingObject)->__CSU.add(b);
+	}
+
+	void CA4G::ComputeBinder::Setting::AddStaticSampler(int slot, const Sampler& sampler)
+	{
+		D3D12_STATIC_SAMPLER_DESC desc = { };
+		desc.AddressU = sampler.AddressU;
+		desc.AddressV = sampler.AddressV;
+		desc.AddressW = sampler.AddressW;
+		desc.BorderColor =
+			!any(sampler.BorderColor - float4(0, 0, 0, 0)) ?
+			D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK :
+			!any(sampler.BorderColor - float4(0, 0, 0, 1)) ?
+			D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK :
+			D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+		desc.ComparisonFunc = sampler.ComparisonFunc;
+		desc.Filter = sampler.Filter;
+		desc.MaxAnisotropy = sampler.MaxAnisotropy;
+		desc.MaxLOD = sampler.MaxLOD;
+		desc.MinLOD = sampler.MinLOD;
+		desc.MipLODBias = sampler.MipLODBias;
+		desc.RegisterSpace = space;
+		desc.ShaderRegister = slot;
+		desc.ShaderVisibility = visibility;
+
+		((InternalBindings*)binder->__InternalBindingObject)->Static_Samplers[((InternalBindings*)binder->__InternalBindingObject)->StaticSamplerMax] = desc;
+		((InternalBindings*)binder->__InternalBindingObject)->StaticSamplerMax++;
 	}
 
 	void CA4G::GraphicsBinder::Setting::SetRenderTarget(int slot, gObj<Texture2D>& const resource)

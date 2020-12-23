@@ -133,13 +133,12 @@ namespace CA4G {
 		IDXDeviceManager* manager;
 		Creating(IDXDeviceManager* manager) :manager(manager) {}
 
-		// Tool method generic to create DX12 resources
-		gObj<ResourceView> CreateDXResource(int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
-			D3D12_CLEAR_VALUE* clearing = nullptr);
-
-		gObj<Texture2D> WrapBackBuffer(void* dxBackBuffer);
-
 	public:
+
+		// Tool method generic to create DX12 resources
+		gObj<ResourceView> CustomDXResource(int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
+			D3D12_CLEAR_VALUE* clearing = nullptr, CPUAccessibility cpuAccessibility = CPUAccessibility::None);
+
 		// Creates a technique of specific type and passing some arguments to the constructor.
 		template<typename T, typename... A>
 		gObj<T> TechniqueObj(A... args);
@@ -151,9 +150,9 @@ namespace CA4G {
 
 #pragma region Creating resources
 
-		gObj<Buffer> Buffer_CB(int elementStride);
+		gObj<Buffer> Buffer_CB(int elementStride, bool dynamic);
 		template <typename T>
-		gObj<Buffer> Buffer_CB() {
+		gObj<Buffer> Buffer_CB(bool dynamic = false) {
 			return Buffer_CB(sizeof(T));
 		}
 

@@ -90,35 +90,37 @@ namespace CA4G {
 			return (DX_ViewWrapper*)view->__InternalViewWrapper;
 		}
 
-		static gObj<ResourceView> ResolveNullView(D3D12_RESOURCE_DIMENSION dimension) {
-			static gObj<Buffer> nullBuffer = nullptr;
-			static gObj<Texture1D> nullTexture1D = nullptr;
-			static gObj<Texture2D> nullTexture2D = nullptr;
-			static gObj<Texture3D> nullTexture3D = nullptr;
+		static gObj<ResourceView> ResolveNullView(DX_Wrapper* wrapper, D3D12_RESOURCE_DIMENSION dimension) {
+			static gObj<ResourceView> nullBuffer = nullptr;
+			static gObj<ResourceView> nullTexture1D = nullptr;
+			static gObj<ResourceView> nullTexture2D = nullptr;
+			static gObj<ResourceView> nullTexture3D = nullptr;
 
 			switch (dimension)
 			{
 			case D3D12_RESOURCE_DIMENSION_BUFFER:
-				return nullBuffer ? nullBuffer : nullBuffer = new Buffer(nullptr, nullptr, 0, 0);
+				return nullBuffer ? nullBuffer : nullBuffer = ResourceView::CreateNullView(wrapper, dimension);
 			case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
-				return nullTexture1D ? nullTexture1D : nullTexture1D = new Texture1D(nullptr, nullptr, DXGI_FORMAT_UNKNOWN, 0, 0, 0);
+				return nullTexture1D ? nullTexture1D : nullTexture1D = ResourceView::CreateNullView(wrapper, dimension);
 			case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
-				return nullTexture2D ? nullTexture2D : nullTexture2D = new Texture2D(nullptr, nullptr, DXGI_FORMAT_UNKNOWN, 0, 0, 0, 0);
+				return nullTexture2D ? nullTexture2D : nullTexture2D = ResourceView::CreateNullView(wrapper, dimension);
 			case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
-				return nullTexture3D ? nullTexture3D : nullTexture3D = new Texture3D(nullptr, nullptr, DXGI_FORMAT_UNKNOWN, 0, 0, 0, 0);
+				return nullTexture3D ? nullTexture3D : nullTexture3D = ResourceView::CreateNullView(wrapper, dimension);
 			default:
 				return nullptr;
 			}
 		}
 
-		static D3D12_CPU_DESCRIPTOR_HANDLE ResolveNullRTVDescriptor();
+		D3D12_CPU_DESCRIPTOR_HANDLE ResolveNullRTVDescriptor();
 	};
 
 	struct DX_ResourceWrapper {
 
-		DX_ResourceWrapper(DX_Wrapper* wrapper, DX_Resource resource, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState)
+		DX_ResourceWrapper(DX_Wrapper* wrapper, DX_Resource resource, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState, CPUAccessibility cpuAccessibility)
 			: device(wrapper->device), dxWrapper(wrapper), resource(resource), desc(desc)
 		{
+			cpuaccess = cpuAccessibility;
+
 			LastUsageState = initialState; // state at creation
 
 			subresources = desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? desc.MipLevels : desc.MipLevels * desc.DepthOrArraySize;
@@ -141,9 +143,9 @@ namespace CA4G {
 
 		// Resource being wrapped
 		DX_Resource resource;
-		// Resourve version for uploading purposes
+		// Resourve version for uploading purposes (in case the CPU can not write directly).
 		DX_Resource uploading;
-		// Resource version for downloading purposes
+		// Resource version for downloading purposes (in case the CPU can not read directly).
 		DX_Resource downloading;
 
 		// Resource description at creation
@@ -166,6 +168,7 @@ namespace CA4G {
 		unsigned int* pNumRows;
 		UINT64* pRowSizesInBytes;
 		UINT64 pTotalSizes;
+		CPUAccessibility cpuaccess;
 
 		// Used to synchronize access to the resource will mapping
 		Mutex mutex;
@@ -175,34 +178,37 @@ namespace CA4G {
 		int references = 0;
 
 		// Resolves an uploading CPU-Writable version for this resource
-		void ResolveUploading() {
+		void __ResolveUploading() {
 			if (!uploading) {
 				mutex.Acquire();
 
 				if (!uploading) {
-					//auto size = GetRequiredIntermediateSize(device, desc);
 
-					D3D12_RESOURCE_DESC finalDesc = { };
-					finalDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-					finalDesc.Format = DXGI_FORMAT_UNKNOWN;
-					finalDesc.Width = pTotalSizes;
-					finalDesc.Height = 1;
-					finalDesc.DepthOrArraySize = 1;
-					finalDesc.MipLevels = 1;
-					finalDesc.SampleDesc.Count = 1;
-					finalDesc.SampleDesc.Quality = 0;
-					finalDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-					finalDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+					if (cpuaccess == CPUAccessibility::Write)
+						uploading = resource; // use the resource for uploading directly
+					else {
+						D3D12_RESOURCE_DESC finalDesc = { };
+						finalDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+						finalDesc.Format = DXGI_FORMAT_UNKNOWN;
+						finalDesc.Width = pTotalSizes;
+						finalDesc.Height = 1;
+						finalDesc.DepthOrArraySize = 1;
+						finalDesc.MipLevels = 1;
+						finalDesc.SampleDesc.Count = 1;
+						finalDesc.SampleDesc.Quality = 0;
+						finalDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+						finalDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-					D3D12_HEAP_PROPERTIES uploadProp;
-					uploadProp.Type = D3D12_HEAP_TYPE_UPLOAD;
-					uploadProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-					uploadProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-					uploadProp.VisibleNodeMask = 1;
-					uploadProp.CreationNodeMask = 1;
+						D3D12_HEAP_PROPERTIES uploadProp;
+						uploadProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+						uploadProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+						uploadProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+						uploadProp.VisibleNodeMask = 1;
+						uploadProp.CreationNodeMask = 1;
 
-					device->CreateCommittedResource(&uploadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-						IID_PPV_ARGS(&uploading));
+						device->CreateCommittedResource(&uploadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+							IID_PPV_ARGS(&uploading));
+					}
 
 					// Automatically map the data to CPU to fill in next instructions
 					// Uploading version is only required if some CPU data is gonna be copied to the GPU resource.
@@ -215,33 +221,36 @@ namespace CA4G {
 		}
 
 		// Resolves a downloading CPU-Readable version for this resource
-		void ResolveDownloading() {
+		void __ResolveDownloading() {
 			if (!this->downloading) {
 				mutex.Acquire();
-
 				if (!downloading) {
-					//auto size = GetRequiredIntermediateSize(device, desc);
 
-					D3D12_RESOURCE_DESC finalDesc = { };
-					finalDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-					finalDesc.Format = DXGI_FORMAT_UNKNOWN;
-					finalDesc.Width = pTotalSizes;
-					finalDesc.Height = 1;
-					finalDesc.DepthOrArraySize = 1;
-					finalDesc.MipLevels = 1;
-					finalDesc.SampleDesc.Count = 1;
-					finalDesc.SampleDesc.Quality = 0;
-					finalDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-					finalDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+					if (cpuaccess == CPUAccessibility::Read)
+						downloading = resource; // Use directly the resource for downloading
+					else {
 
-					D3D12_HEAP_PROPERTIES downloadProp;
-					downloadProp.Type = D3D12_HEAP_TYPE_READBACK;
-					downloadProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-					downloadProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-					downloadProp.VisibleNodeMask = 1;
-					downloadProp.CreationNodeMask = 1;
-					device->CreateCommittedResource(&downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-						IID_PPV_ARGS(&downloading));
+						D3D12_RESOURCE_DESC finalDesc = { };
+						finalDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+						finalDesc.Format = DXGI_FORMAT_UNKNOWN;
+						finalDesc.Width = pTotalSizes;
+						finalDesc.Height = 1;
+						finalDesc.DepthOrArraySize = 1;
+						finalDesc.MipLevels = 1;
+						finalDesc.SampleDesc.Count = 1;
+						finalDesc.SampleDesc.Quality = 0;
+						finalDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+						finalDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+						D3D12_HEAP_PROPERTIES downloadProp;
+						downloadProp.Type = D3D12_HEAP_TYPE_READBACK;
+						downloadProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+						downloadProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+						downloadProp.VisibleNodeMask = 1;
+						downloadProp.CreationNodeMask = 1;
+						device->CreateCommittedResource(&downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+							IID_PPV_ARGS(&downloading));
+					}
 				}
 
 				mutex.Release();
@@ -249,12 +258,12 @@ namespace CA4G {
 		}
 
 		void UploadToSubresource0(long dstOffset, byte* data, long size) {
-			ResolveUploading();
+			__ResolveUploading();
 			memcpy(permanentUploadingMap + dstOffset, (UINT8*)data, size);
 		}
 
 		void DownloadFromSubresource0(long srcOffset, long size, byte* dstData) {
-			ResolveDownloading();
+			__ResolveDownloading();
 
 			mutex.Acquire(); // sync data access to map downloaded version
 
@@ -296,7 +305,7 @@ namespace CA4G {
 		}
 
 		void UploadToAllSubresource(byte* data, long size, bool flipRows) {
-			ResolveUploading();
+			__ResolveUploading();
 			int srcOffset = 0;
 			for (UINT i = 0; i < subresources; ++i)
 			{
@@ -391,7 +400,7 @@ namespace CA4G {
 		}
 
 		void UploadRegion(int subresource, byte* data, D3D12_BOX* box = nullptr) {
-			ResolveUploading();
+			__ResolveUploading();
 
 			D3D12_BOX fullBox{ 0, 0, 0, pLayouts[subresource].Footprint.Width, pLayouts[subresource].Footprint.Height, desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize };
 
@@ -416,7 +425,7 @@ namespace CA4G {
 		}
 
 		void DownloadFromAllSubresources(byte* data, long size, bool flipRows) {
-			ResolveDownloading();
+			__ResolveDownloading();
 
 			D3D12_RANGE range{ 0, size };
 
@@ -446,12 +455,16 @@ namespace CA4G {
 			mutex.Release();
 		}
 
-		void UploadToGPU(DX_CommandList cmd) {
-			cmd->CopyResource(resource, uploading);
+		// Copies the resource data from uploading version to GPU
+		void GrantGPUAccess(DX_CommandList cmd) {
+			if (resource != uploading)
+				cmd->CopyResource(resource, uploading);
 		}
 
-		void DownloadFromGPU(DX_CommandList cmd) {
-			cmd->CopyResource(downloading, resource);
+		// Copies the resource data to the downloading version from the GPU.
+		void GrantCPUAccess(DX_CommandList cmd) {
+			if (resource != downloading)
+				cmd->CopyResource(downloading, resource);
 		}
 
 		void AddBarrier(DX_CommandList cmdList, D3D12_RESOURCE_STATES dst) {
@@ -545,7 +558,7 @@ namespace CA4G {
 				d.Buffer.NumElements = arrayCount;
 				d.Buffer.StructureByteStride = elementStride;
 				d.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-				d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+				d.Format = !resource->resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
 				break;
 			case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
 				d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -554,7 +567,7 @@ namespace CA4G {
 				d.Texture1DArray.MipLevels = mipCount;
 				d.Texture1DArray.MostDetailedMip = mipStart;
 				d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
-				d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				d.Format = !resource->resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
 				break;
 			case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
 				d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -563,7 +576,7 @@ namespace CA4G {
 				d.Texture2DArray.MipLevels = mipCount;
 				d.Texture2DArray.MostDetailedMip = mipStart;
 				d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-				d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				d.Format = !resource->resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
 				break;
 			case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
 				d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -571,27 +584,23 @@ namespace CA4G {
 				d.Texture3D.MostDetailedMip = mipStart;
 				d.Texture3D.ResourceMinLODClamp = 0;
 				d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-				d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				d.Format = !resource->resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
 				break;
 			}
 		}
 
 		void CreateVBV(D3D12_VERTEX_BUFFER_VIEW& desc) {
 			desc = { };
-			desc.BufferLocation =
-				!resource ? 0 : resource->resource->GetGPUVirtualAddress();// +
-				//arrayStart * elementStride;
+			desc.BufferLocation = !resource->resource ? 0 : resource->resource->GetGPUVirtualAddress();
 			desc.StrideInBytes = elementStride;
-			desc.SizeInBytes = arrayCount * elementStride;
+			desc.SizeInBytes = (arrayStart + arrayCount) * elementStride;
 		}
 
 		void CreateIBV(D3D12_INDEX_BUFFER_VIEW& desc) {
 			desc = { };
-			desc.BufferLocation =
-				!resource ? 0 : resource->resource->GetGPUVirtualAddress() +
-				arrayStart * elementStride;
+			desc.BufferLocation = !resource->resource ? 0 : resource->resource->GetGPUVirtualAddress();
 			desc.Format = !resource ? DXGI_FORMAT_UNKNOWN : elementStride == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
-			desc.SizeInBytes = arrayCount * elementStride;
+			desc.SizeInBytes = (arrayStart + arrayCount) * elementStride;
 		}
 
 		void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC& d)
@@ -600,7 +609,7 @@ namespace CA4G {
 			d.Texture2DArray.FirstArraySlice = arrayStart;
 			d.Texture2DArray.MipSlice = mipStart;
 			d.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+			d.Format = !resource->resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
 		}
 
 		int getSRV() {
@@ -714,6 +723,8 @@ namespace CA4G {
 		list<D3D12_CPU_DESCRIPTOR_HANDLE> srcDescriptors = {};
 		list<D3D12_CPU_DESCRIPTOR_HANDLE> dstDescriptors = {};
 		list<unsigned int> dstDescriptorRangeLengths = {};
+		int vertexBufferSliceOffset = 0;
+		int indexBufferSliceOffset = 0;
 	};
 
 	#pragma region Command Queue Manager
