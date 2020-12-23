@@ -59,9 +59,45 @@ namespace CA4G {
 
 		int startRootParameter = 0;
 
+		bool IsLocal = false;
+
 		void BindToGPU(DX_Wrapper* dxwrapper, DX_CmdWrapper* cmdWrapper) {
 			auto device = dxwrapper->device;
 			auto cmdList = cmdWrapper->cmdList;
+
+			if (!IsLocal /*Only for global bindings*/)
+			{
+
+#pragma region Bind Render Targets and DepthBuffer if any
+				if (EngineType == Engine::Direct)
+				{
+					for (int i = 0; i < RenderTargetMax; i++)
+						if (!(*RenderTargets[i]))
+							RenderTargetDescriptors[i] = DX_Wrapper::ResolveNullRTVDescriptor();
+						else
+						{
+							DX_ResourceWrapper* iresource = DX_Wrapper::InternalResource(*RenderTargets[i]);
+							DX_ViewWrapper* vresource = DX_Wrapper::InternalView(*RenderTargets[i]);
+							iresource->AddBarrier(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+							RenderTargetDescriptors[i] = vresource->getRTVHandle();
+						}
+
+					D3D12_CPU_DESCRIPTOR_HANDLE depthHandle;
+					if (!(DepthBufferField == nullptr || !(*DepthBufferField)))
+					{
+						DX_ViewWrapper* vresource = DX_Wrapper::InternalView(*DepthBufferField);
+						depthHandle = vresource->getDSVHandle();
+					}
+
+					cmdList->OMSetRenderTargets(RenderTargetMax, RenderTargetDescriptors, FALSE, (DepthBufferField == nullptr || !(*DepthBufferField)) ? nullptr : &depthHandle);
+				}
+				ID3D12DescriptorHeap* heaps[] = { dxwrapper->gpu_csu->getInnerHeap(), dxwrapper->gpu_smp->getInnerHeap() };
+				cmdList->SetDescriptorHeaps(2, heaps);
+			}
+
+#pragma endregion
+
 			// Foreach bound slot
 			for (int i = 0; i < __CSU.size(); i++)
 			{
@@ -203,10 +239,15 @@ namespace CA4G {
 		((InternalBindings*)__InternalBindingObject)->EngineType = Engine::Raytracing;
 	}
 
+	void CA4G::GraphicsBinder::Setting::SetRenderTarget(int slot, gObj<Texture2D>& const resource)
+	{
+		((InternalBindings*)binder->__InternalBindingObject)->RenderTargets[slot] = &resource;
+		((InternalBindings*)binder->__InternalBindingObject)->RenderTargetMax = max(((InternalBindings*)binder->__InternalBindingObject)->RenderTargetMax, slot + 1);
+	}
+
 #pragma endregion
 
-	template<typename ...PSS>
-	void StaticPipelineBindings<PSS...>::OnLoad(IDXWrapper* dxWrapper) {
+	void StaticPipelineBindingsBase::OnCreate(DX_Wrapper* dxwrapper) {
 
 		// Call setup to set all states of the setting object.
 		Setup();
@@ -214,13 +255,13 @@ namespace CA4G {
 		// When a pipeline is loaded it should collect all bindings for global and local events.
 		InternalStaticPipelineWrapper* wrapper = new InternalStaticPipelineWrapper();
 		this->__InternalStaticPipelineWrapper = wrapper;
-		DX_Wrapper* dxwrapper = (DX_Wrapper*)dxWrapper->__InternalDXWrapper;
 		wrapper->wrapper = dxwrapper;
 		wrapper->globalBinder = this->OnCollectGlobalBindings();
 		wrapper->localBinder = this->OnCollectLocalBindings();
 		InternalBindings* globalBindings = (InternalBindings*)wrapper->globalBinder->__InternalBindingObject;
 		InternalBindings* localBindings = (InternalBindings*)wrapper->localBinder->__InternalBindingObject;
 		localBindings->startRootParameter = globalBindings->__CSU.size() + globalBindings->__Samplers.size();
+		localBindings->IsLocal = true;
 
 		// Create the root signature for both groups together
 		#pragma region Creating Root Signature
@@ -244,12 +285,7 @@ namespace CA4G {
 		desc.NumParameters = index;
 		desc.pStaticSamplers = globalBindings->Static_Samplers;
 		desc.NumStaticSamplers = globalBindings->StaticSamplerMax;
-		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-		if (!Using_VS()) desc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS;
-		if (!Using_PS()) desc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
-		if (!Using_GS()) desc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-		if (!Using_HS()) desc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-		if (!Using_DS()) desc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
+		desc.Flags = getRootFlags();
 
 		ID3DBlob* signatureBlob;
 		ID3DBlob* signatureErrorBlob;
@@ -279,22 +315,9 @@ namespace CA4G {
 		// Create the pipeline state object
 		#pragma region Create Pipeline State Object
 
-		if (HasSubobjectState(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE::D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE))
-		{
-			((RootSignatureStateManager*)set)->SetRootSignature(wrapper->rootSignature);
-		}
-		if (HasSubobjectState(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE::D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS))
-		{
-			RenderTargetFormatsStateManager* rtfsm = (RenderTargetFormatsStateManager*)set;
-			if (rtfsm->_Description.NumRenderTargets == 0)
-				rtfsm->AllRenderTargets(8, DXGI_FORMAT_R8G8B8A8_UNORM);
-		}
-		if (HasSubobjectState(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT))
-		{
-			DepthStencilFormatStateManager* dsfsm = (DepthStencilFormatStateManager*)set;
-			dsfsm->_Description = DXGI_FORMAT_D32_FLOAT;
-		}
-		const D3D12_PIPELINE_STATE_STREAM_DESC streamDesc = { sizeof(*set), set };
+		CompleteStateObject(wrapper->rootSignature);
+
+		const D3D12_PIPELINE_STATE_STREAM_DESC streamDesc = { (SIZE_T)getSettingObjectSize(), getSettingObject() };
 		hr = dxwrapper->device->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&wrapper->pso));
 		if (FAILED(hr)) {
 			auto _hr = dxwrapper->device->GetDeviceRemovedReason();
@@ -304,17 +327,57 @@ namespace CA4G {
 		#pragma endregion
 	}
 
-	template<typename ...PSS>
-	void StaticPipelineBindings<PSS...>::OnSet(ICmdWrapper* cmdWrapper) {
-		gObj<ComputeBinder> binder = ((InternalStaticPipelineWrapper*)this->__InternalStaticPipelineWrapper)->globalBinder;
+	void StaticPipelineBindingsBase::OnSet(ICmdManager* cmdWrapper) {
+		// Set the pipeline state object into the cmdList
 		InternalStaticPipelineWrapper* wrapper = (InternalStaticPipelineWrapper*)this->__InternalStaticPipelineWrapper;
-		((InternalBindings*)binder->__InternalBindingObject)->BindToGPU(wrapper->wrapper, (DX_CmdWrapper*) cmdWrapper->__InternalDXCmdWrapper);
+		cmdWrapper->__InternalDXCmdWrapper->cmdList->SetPipelineState(wrapper->pso);
+		// Set root signature
+		if (this->GetEngine() == Engine::Compute)
+			cmdWrapper->__InternalDXCmdWrapper->cmdList->SetComputeRootSignature(wrapper->rootSignature);
+		else
+			cmdWrapper->__InternalDXCmdWrapper->cmdList->SetGraphicsRootSignature(wrapper->rootSignature);
+
+		// Bind global resources on the root signature
+		gObj<ComputeBinder> binder = ((InternalStaticPipelineWrapper*)this->__InternalStaticPipelineWrapper)->globalBinder;
+		((InternalBindings*)binder->__InternalBindingObject)->BindToGPU(wrapper->wrapper, cmdWrapper->__InternalDXCmdWrapper);
 	}
 
-	template<typename ...PSS>
-	void StaticPipelineBindings<PSS...>::OnDispatch(ICmdWrapper* cmdWrapper) {
+	void StaticPipelineBindingsBase::OnDispatch(ICmdManager* cmdWrapper) {
 		gObj<ComputeBinder> binder = ((InternalStaticPipelineWrapper*)this->__InternalStaticPipelineWrapper)->localBinder;
 		InternalStaticPipelineWrapper* wrapper = (InternalStaticPipelineWrapper*)this->__InternalStaticPipelineWrapper;
-		((InternalBindings*)binder->__InternalBindingObject)->BindToGPU(wrapper->wrapper, (DX_CmdWrapper*)cmdWrapper->__InternalDXCmdWrapper);
+		((InternalBindings*)binder->__InternalBindingObject)->BindToGPU(wrapper->wrapper, cmdWrapper->__InternalDXCmdWrapper);
 	}
+
+	D3D12_SHADER_BYTECODE ShaderLoader::FromFile(const char* bytecodeFilePath) {
+		D3D12_SHADER_BYTECODE code;
+		FILE* file;
+		if (fopen_s(&file, bytecodeFilePath, "rb") != 0)
+		{
+			throw CA4GException::FromError(CA4G_Errors_ShaderNotFound);
+		}
+		fseek(file, 0, SEEK_END);
+		long long count;
+		count = ftell(file);
+		fseek(file, 0, SEEK_SET);
+
+		byte* bytecode = new byte[count];
+		int offset = 0;
+		while (offset < count) {
+			offset += fread_s(&bytecode[offset], min(1024, count - offset), sizeof(byte), 1024, file);
+		}
+		fclose(file);
+
+		code.BytecodeLength = count;
+		code.pShaderBytecode = (void*)bytecode;
+		return code;
+	}
+
+	D3D12_SHADER_BYTECODE ShaderLoader::FromMemory(const byte* bytecodeData, int count) {
+		D3D12_SHADER_BYTECODE code;
+		code.BytecodeLength = count;
+		code.pShaderBytecode = (void*)bytecodeData;
+		return code;
+	}
+
+
 }

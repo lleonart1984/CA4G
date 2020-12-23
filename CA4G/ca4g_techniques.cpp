@@ -9,7 +9,7 @@ namespace CA4G {
 		int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
 		D3D12_CLEAR_VALUE* clearing)
 	{
-		DX_Wrapper* w = (DX_Wrapper*)wrapper->__InternalDXWrapper;
+		DX_Wrapper* w = manager->__InternalDXWrapper;
 		auto device = w->device;
 
 		D3D12_HEAP_PROPERTIES defaultProp;
@@ -29,7 +29,7 @@ namespace CA4G {
 			throw CA4GException::FromError(CA4G_Errors_RunOutOfMemory, nullptr, _hr);
 		}
 
-		DX_ResourceWrapper* rwrapper = new DX_ResourceWrapper((DX_Wrapper*) this->wrapper->__InternalDXWrapper, resource, desc, initialState);
+		DX_ResourceWrapper* rwrapper = new DX_ResourceWrapper(manager->__InternalDXWrapper, resource, desc, initialState);
 		rwrapper->elementStride = rwrapper->desc.Format == DXGI_FORMAT_UNKNOWN ? elementWidth : rwrapper->SizeOfFormatElement(rwrapper->desc.Format);
 		switch (desc.Dimension) {
 		case D3D12_RESOURCE_DIMENSION_BUFFER:
@@ -43,19 +43,6 @@ namespace CA4G {
 		}
 		return nullptr;
 	}
-
-	/*gObj<Texture2D> Creating::WrapBackBuffer(void* dxBackBuffer) {
-		DX_Wrapper* w = (DX_Wrapper*)wrapper->__InternalDXWrapper;
-		auto device = w->device;
-
-		CComPtr<ID3D12Resource1> resource = (ID3D12Resource1*)dxBackBuffer;
-
-		auto desc = resource->GetDesc();
-
-		DX_ResourceWrapper* rw = new DX_ResourceWrapper(device, resource, desc, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-		return new Texture2D(rw, nullptr, desc.Format, desc.Width, desc.Height, 1, 1);
-	}*/
 
 	void FillBufferDescription(D3D12_RESOURCE_DESC& desc, long width, D3D12_RESOURCE_FLAGS flag = D3D12_RESOURCE_FLAG_NONE) {
 		desc.Width = width;
@@ -218,12 +205,12 @@ namespace CA4G {
 		return CreateDXResource(0, desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr).Dynamic_Cast<Texture3D>();
 	}
 
-	gObj<Texture2D> IDXWrapper::GetRenderTarget() {
+	gObj<Texture2D> IDXDeviceManager::GetRenderTarget() {
 		return __InternalState->RenderTargets[__InternalState->swapChain->GetCurrentBackBufferIndex()];
 	}
 
 	Signal Creating::FlushAndSignal(EngineMask mask) {
-		DX_Wrapper* w = (DX_Wrapper*)this->wrapper->__InternalDXWrapper;
+		DX_Wrapper* w = manager->__InternalDXWrapper;
 		return w->scheduler->FlushAndSignal(mask);
 	}
 
@@ -233,7 +220,7 @@ namespace CA4G {
 
 	void Technique::Setting::Tag(Tagging data)
 	{
-		auto scheduler = ((DX_Wrapper*)this->wrapper->__InternalDXWrapper)->scheduler;
+		auto scheduler = this->manager->__InternalDXWrapper->scheduler;
 		scheduler->Tag = data;
 	}
 }

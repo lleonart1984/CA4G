@@ -89,9 +89,9 @@ namespace CA4G {
 	class IRTProgram {
 		void* __DXProgramWrapper;
 
-		ICmdWrapper* __CmdWrapper;
+		ICmdManager* __CmdWrapper;
 
-		void OnLoad(void* dxWrapper, ICmdWrapper* cmdWrapper);
+		void OnLoad(void* dxWrapper, ICmdManager* cmdWrapper);
 
 	public:
 		virtual ~IRTProgram() {}

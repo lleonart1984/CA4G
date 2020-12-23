@@ -1,10 +1,7 @@
 #ifndef CA4G_H
 #define CA4G_H
 
-//#include "ca4g_gmath.h"
-//#include "ca4g_resources.h"
-#include "ca4g_presenter.h"
-
+#include "ca4g_pipelines.h"
 
 #pragma region DSL commands
 

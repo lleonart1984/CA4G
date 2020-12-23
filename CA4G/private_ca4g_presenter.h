@@ -33,7 +33,7 @@ namespace CA4G {
 
 		GPUScheduler* scheduler;
 
-		#pragma region Descriptor Heaps
+#pragma region Descriptor Heaps
 
 		// -- Shader visible heaps --
 
@@ -58,7 +58,7 @@ namespace CA4G {
 		// Descriptor heap for sampler objects in CPU memory
 		gObj<CPUDescriptorHeapManager> cpu_smp;
 
-		#pragma endregion
+#pragma endregion
 
 		DX_Wrapper() {
 			UseFallbackDevice = false;
@@ -80,7 +80,7 @@ namespace CA4G {
 
 		void Initialize();
 
-		static DX_ResourceWrapper* InternalResource(gObj<ResourceView> view) 
+		static DX_ResourceWrapper* InternalResource(gObj<ResourceView> view)
 		{
 			return (DX_ResourceWrapper*)view->__InternalDXWrapper;
 		}
@@ -110,6 +110,8 @@ namespace CA4G {
 				return nullptr;
 			}
 		}
+
+		static D3D12_CPU_DESCRIPTOR_HANDLE ResolveNullRTVDescriptor();
 	};
 
 	struct DX_ResourceWrapper {
@@ -253,7 +255,7 @@ namespace CA4G {
 
 		void DownloadFromSubresource0(long srcOffset, long size, byte* dstData) {
 			ResolveDownloading();
-			
+
 			mutex.Acquire(); // sync data access to map downloaded version
 
 			D3D12_RANGE range{ srcOffset, size };
@@ -390,9 +392,9 @@ namespace CA4G {
 
 		void UploadRegion(int subresource, byte* data, D3D12_BOX* box = nullptr) {
 			ResolveUploading();
-			
+
 			D3D12_BOX fullBox{ 0, 0, 0, pLayouts[subresource].Footprint.Width, pLayouts[subresource].Footprint.Height, desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize };
-			
+
 			if (box == nullptr)
 				box = &fullBox;
 
@@ -415,7 +417,7 @@ namespace CA4G {
 
 		void DownloadFromAllSubresources(byte* data, long size, bool flipRows) {
 			ResolveDownloading();
-			
+
 			D3D12_RANGE range{ 0, size };
 
 			byte* mappedData;
@@ -462,7 +464,7 @@ namespace CA4G {
 				barrier.UAV.pResource = this->resource;
 				cmdList->ResourceBarrier(1, &barrier);
 			}
-			
+
 			if (this->LastUsageState == dst)
 				return;
 
@@ -522,7 +524,7 @@ namespace CA4G {
 			return D3D12_CPU_DESCRIPTOR_HANDLE();
 		}
 
-		#pragma region Creating view handles and caching
+#pragma region Creating view handles and caching
 
 		void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC& d)
 		{
@@ -574,6 +576,33 @@ namespace CA4G {
 			}
 		}
 
+		void CreateVBV(D3D12_VERTEX_BUFFER_VIEW& desc) {
+			desc = { };
+			desc.BufferLocation =
+				!resource ? 0 : resource->resource->GetGPUVirtualAddress();// +
+				//arrayStart * elementStride;
+			desc.StrideInBytes = elementStride;
+			desc.SizeInBytes = arrayCount * elementStride;
+		}
+
+		void CreateIBV(D3D12_INDEX_BUFFER_VIEW& desc) {
+			desc = { };
+			desc.BufferLocation =
+				!resource ? 0 : resource->resource->GetGPUVirtualAddress() +
+				arrayStart * elementStride;
+			desc.Format = !resource ? DXGI_FORMAT_UNKNOWN : elementStride == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+			desc.SizeInBytes = arrayCount * elementStride;
+		}
+
+		void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC& d)
+		{
+			d.Texture2DArray.ArraySize = arrayCount;
+			d.Texture2DArray.FirstArraySlice = arrayStart;
+			d.Texture2DArray.MipSlice = mipStart;
+			d.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
 		int getSRV() {
 			if ((handle_mask & 1) != 0)
 				return srv_cached_handle;
@@ -611,6 +640,30 @@ namespace CA4G {
 			return rtv_cached_handle;
 		}
 
+		int getDSV() {
+
+			if ((handle_mask & 16) != 0)
+				return dsv_cached_handle;
+
+			mutex.Acquire();
+
+			if ((handle_mask & 16) == 0) {
+				D3D12_DEPTH_STENCIL_VIEW_DESC d;
+				ZeroMemory(&d, sizeof(D3D12_DEPTH_STENCIL_VIEW_DESC));
+				CreateDSVDesc(d);
+				dsv_cached_handle = resource->dxWrapper->cpu_ds->AllocateNewHandle();
+				resource->dxWrapper->device->CreateDepthStencilView(!resource ? nullptr : resource->resource, &d, resource->dxWrapper->cpu_ds->getCPUVersion(dsv_cached_handle));
+				handle_mask |= 16;
+			}
+
+			mutex.Release();
+			return dsv_cached_handle;
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getDSVHandle() {
+			return resource->dxWrapper->cpu_ds->getCPUVersion(getDSV());
+		}
+
 		D3D12_CPU_DESCRIPTOR_HANDLE getRTVHandle() {
 			return resource->dxWrapper->cpu_rt->getCPUVersion(getRTV());
 		}
@@ -619,7 +672,7 @@ namespace CA4G {
 			return resource->dxWrapper->cpu_csu->getCPUVersion(getSRV());
 		}
 
-		#pragma endregion
+#pragma endregion
 
 		// Gets the current view dimension of the resource.
 		D3D12_RESOURCE_DIMENSION ViewDimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
@@ -654,9 +707,10 @@ namespace CA4G {
 			return result;
 		}
 	};
-
+	
 	struct DX_CmdWrapper {
 		DX_CommandList cmdList = nullptr;
+		gObj<IPipelineBindings> currentPipeline = nullptr;
 		list<D3D12_CPU_DESCRIPTOR_HANDLE> srcDescriptors = {};
 		list<D3D12_CPU_DESCRIPTOR_HANDLE> dstDescriptors = {};
 		list<unsigned int> dstDescriptorRangeLengths = {};
@@ -930,7 +984,10 @@ namespace CA4G {
 			// Get current RT
 			auto currentRT = this->dxWrapper->RenderTargets[this->CurrentFrameIndex];
 			DX_ResourceWrapper* rtWrapper = (DX_ResourceWrapper*) currentRT->__InternalDXWrapper;
-			
+
+			// Activate cmd0
+			this->Engines[0].threadInfos[0].
+				Activate(this->Engines[0].frames[this->CurrentFrameIndex].RequireAllocator(0));
 			// Place a barrier at thread 0 cmdList to Present
 			rtWrapper->AddBarrier(this->Engines[0].threadInfos[0].cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}

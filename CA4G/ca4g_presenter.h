@@ -67,7 +67,7 @@ namespace CA4G {
 	};
 
 	/// Base type for all types of engines
-	class CommandListManager : public ICmdWrapper {
+	class CommandListManager : public ICmdManager {
 		friend GPUScheduler;
 		Tagging __Tag;
 
@@ -93,8 +93,8 @@ namespace CA4G {
 			friend CopyManager;
 
 		protected:
-			ICmdWrapper* wrapper;
-			Clearing(ICmdWrapper* wrapper) :wrapper(wrapper) {}
+			ICmdManager* wrapper;
+			Clearing(ICmdManager* wrapper) :wrapper(wrapper) {}
 		public:
 
 			void UAV(gObj<ResourceView> uav, const FLOAT values[4]);
@@ -118,7 +118,7 @@ namespace CA4G {
 		class Copying {
 			friend CopyManager;
 
-			ICmdWrapper* wrapper;
+			ICmdManager* wrapper;
 
 			void FastCopyToStart(gObj<ResourceView> dst, byte* data, long size);
 
@@ -129,7 +129,7 @@ namespace CA4G {
 
 			void FullCopyFromSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box = nullptr);
 			
-			Copying(ICmdWrapper* wrapper) : wrapper(wrapper) {}
+			Copying(ICmdManager* wrapper) : wrapper(wrapper) {}
 
 		public:
 
@@ -223,18 +223,18 @@ namespace CA4G {
 			delete dispatch;
 		}
 		class Setter {
-			ICmdWrapper* wrapper;
+			ICmdManager* wrapper;
 		public:
-			Setter(ICmdWrapper* wrapper) :wrapper(wrapper) {
+			Setter(ICmdManager* wrapper) :wrapper(wrapper) {
 			}
 			// Sets a graphics pipeline
 			void Pipeline(gObj<IPipelineBindings> pipeline);
 		}* const set;
 
 		class Dispatcher {
-			ICmdWrapper* wrapper;
+			ICmdManager* wrapper;
 		public:
-			Dispatcher(ICmdWrapper* wrapper) :wrapper(wrapper) {
+			Dispatcher(ICmdManager* wrapper) :wrapper(wrapper) {
 			}
 
 			// Dispatches a specific number of threads to execute current compute shader set.
@@ -253,9 +253,9 @@ namespace CA4G {
 		}
 	public:
 		class Setter {
-			ICmdWrapper* wrapper;
+			ICmdManager* wrapper;
 		public:
-			Setter(ICmdWrapper* wrapper) : wrapper(wrapper) {
+			Setter(ICmdManager* wrapper) : wrapper(wrapper) {
 			}
 
 			// Sets a graphics pipeline
@@ -274,7 +274,7 @@ namespace CA4G {
 		class Clearing : public CopyManager::Clearing {
 			friend GraphicsManager;
 
-			Clearing(ICmdWrapper* wrapper) : CopyManager::Clearing(wrapper) {}
+			Clearing(ICmdManager* wrapper) : CopyManager::Clearing(wrapper) {}
 		public:
 			void RT(gObj<Texture2D> rt, const FLOAT values[4]);
 			inline void RT(gObj<Texture2D> rt, const float4& value) {
@@ -297,9 +297,9 @@ namespace CA4G {
 		* const clear;
 
 		class Dispatcher {
-			ICmdWrapper* wrapper;
+			ICmdManager* wrapper;
 		public:
-			Dispatcher(ICmdWrapper* wrapper) :wrapper(wrapper) {
+			Dispatcher(ICmdManager* wrapper) :wrapper(wrapper) {
 			}
 
 			// Draws a primitive using a specific number of vertices
@@ -328,9 +328,9 @@ namespace CA4G {
 		}
 	public:
 		class Setter {
-			ICmdWrapper* wrapper;
+			ICmdManager* wrapper;
 		public:
-			Setter(ICmdWrapper* wrapper) :wrapper(wrapper) {
+			Setter(ICmdManager* wrapper) :wrapper(wrapper) {
 			}
 			void Pipeline(gObj<IPipelineBindings> bindings);
 
@@ -399,8 +399,8 @@ namespace CA4G {
 		friend Presenter;
 		friend Technique;
 
-		IDXWrapper* wrapper;
-		Dispatcher(IDXWrapper* wrapper) :wrapper(wrapper) {}
+		IDXDeviceManager* wrapper;
+		Dispatcher(IDXDeviceManager* wrapper) :wrapper(wrapper) {}
 	public:
 		void TechniqueObj(gObj<Technique> technique) {
 			technique->OnDispatch();
@@ -453,7 +453,7 @@ namespace CA4G {
 		void BackBuffer();
 	};
 
-	class Presenter : public IDXWrapper {
+	class Presenter : public IDXDeviceManager {
 
 	public:
 		// Creates a presenter object that creates de DX device attached to a specific window (hWnd).

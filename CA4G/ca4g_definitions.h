@@ -26,16 +26,21 @@ namespace CA4G {
 	class Texture3D;
 	struct Signal;
 	class Tagging;
-	class ICmdWrapper;
+	class ICmdManager;
 	class CommandListManager;
 	class CopyManager;
 	class ComputeManager;
 	class GraphicsManager;
 	class RaytracingManager;
+	class StaticPipelineBindingsBase;
+	template<typename ...PSS> class StaticPipelineBindings;
 
 	// Internal Management
 	struct GPUScheduler;
 	struct DX_Wrapper;
+	struct DX_ResourceWrapper;
+	struct DX_ViewWrapper;
+	struct DX_CmdWrapper;
 }
 
 #endif

@@ -2,7 +2,7 @@
 
 namespace CA4G {
 
-	ResourceView::ResourceView(void* internalDXWrapper, void* internalViewWrapper)
+	ResourceView::ResourceView(DX_ResourceWrapper* internalDXWrapper, DX_ViewWrapper* internalViewWrapper)
 		: __InternalDXWrapper(internalDXWrapper),
 		__InternalViewWrapper(internalViewWrapper) {
 		((DX_ResourceWrapper*)this->__InternalDXWrapper)->references++;

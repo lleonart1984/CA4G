@@ -133,6 +133,16 @@ namespace CA4G {
 		w->scheduler->EnqueueAsync(process);
 	}
 
+#pragma region DX_Wrapper
+
+	D3D12_CPU_DESCRIPTOR_HANDLE DX_Wrapper::ResolveNullRTVDescriptor() {
+		return ResolveNullView(D3D12_RESOURCE_DIMENSION_TEXTURE2D)->__InternalViewWrapper->getRTVHandle();
+	}
+
+
+#pragma endregion
+
+
 #pragma region Clearing
 
 	void GraphicsManager::Clearing::RT(gObj<Texture2D> rt, const FLOAT values[4]) {
@@ -145,7 +155,7 @@ namespace CA4G {
 
 #pragma endregion
 
-#pragma region Copying
+#pragma region Copy Manager
 
 	void CopyManager::Copying::FastCopyToStart(gObj<ResourceView> dst, byte* data, long size) {
 		auto resource = (DX_ResourceWrapper*)dst->__InternalDXWrapper;
@@ -170,6 +180,76 @@ namespace CA4G {
 		else { // copy all subresources of the view/slice
 
 		}
+	}
+
+#pragma endregion
+
+#pragma region Graphics Manager
+
+	void GraphicsManager::Setter::Pipeline(gObj<IPipelineBindings> pipeline) {
+		DX_CmdWrapper* cmdWrapper = this->wrapper->__InternalDXCmdWrapper;
+		cmdWrapper->currentPipeline = pipeline;
+
+		pipeline->OnSet(this->wrapper);
+	}
+
+	void GraphicsManager::Setter::Viewport(float width, float height, float maxDepth, float x, float y, float minDepth)
+	{
+		D3D12_VIEWPORT viewport;
+		viewport.Width = width;
+		viewport.Height = height;
+		viewport.MinDepth = minDepth;
+		viewport.MaxDepth = maxDepth;
+		viewport.TopLeftX = x;
+		viewport.TopLeftY = y;
+		wrapper->__InternalDXCmdWrapper->cmdList->RSSetViewports(1, &viewport);
+
+		D3D12_RECT rect;
+		rect.left = (int)x;
+		rect.top = (int)y;
+		rect.right = (int)x + (int)width;
+		rect.bottom = (int)y + (int)height;
+		wrapper->__InternalDXCmdWrapper->cmdList->RSSetScissorRects(1, &rect);
+	}
+
+	void CA4G::GraphicsManager::Setter::VertexBuffer(gObj<Buffer> buffer, int slot)
+	{
+		buffer->__InternalDXWrapper->AddBarrier(wrapper->__InternalDXCmdWrapper->cmdList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		D3D12_VERTEX_BUFFER_VIEW view;
+		buffer->__InternalViewWrapper->CreateVBV(view);
+		wrapper->__InternalDXCmdWrapper->cmdList->IASetVertexBuffers(slot, 1, &view);
+	}
+
+	void CA4G::GraphicsManager::Setter::IndexBuffer(gObj<Buffer> buffer)
+	{
+		buffer->__InternalDXWrapper->AddBarrier(wrapper->__InternalDXCmdWrapper->cmdList, D3D12_RESOURCE_STATE_INDEX_BUFFER);
+		D3D12_INDEX_BUFFER_VIEW view;
+		buffer->__InternalViewWrapper->CreateIBV(view);
+		wrapper->__InternalDXCmdWrapper->cmdList->IASetIndexBuffer(&view);
+	}
+
+	void CA4G::GraphicsManager::Dispatcher::IndexedPrimitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start)
+	{
+		DX_CmdWrapper* cmdWrapper = wrapper->__InternalDXCmdWrapper;
+
+		if (!cmdWrapper->currentPipeline) {
+			throw new CA4G::CA4GException("Invalid operation, Pipeline should be set first");
+		}
+		cmdWrapper->currentPipeline->OnDispatch(this->wrapper);
+		cmdWrapper->cmdList->IASetPrimitiveTopology(topology);
+		cmdWrapper->cmdList->DrawIndexedInstanced(count, 1, start, 0, 0);
+	}
+
+	void CA4G::GraphicsManager::Dispatcher::Primitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start)
+	{
+		DX_CmdWrapper* cmdWrapper = wrapper->__InternalDXCmdWrapper;
+
+		if (!cmdWrapper->currentPipeline) {
+			throw new CA4G::CA4GException("Invalid operation, Pipeline should be set first");
+		}
+		cmdWrapper->currentPipeline->OnDispatch(this->wrapper);
+		cmdWrapper->cmdList->IASetPrimitiveTopology(topology);
+		cmdWrapper->cmdList->DrawInstanced(count, 1, start, 0);
 	}
 
 #pragma endregion

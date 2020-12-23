@@ -94,4 +94,8 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\Demo_VS.hlsl" />
+    <FxCompile Include="Shaders\Demo_PS.hlsl" />
+  </ItemGroup>
 </Project>

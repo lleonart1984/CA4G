@@ -6,7 +6,8 @@
 
 namespace CA4G {
 	
-	class IDXWrapper {
+	// Represents the object manages a DX12 device internally for rendering purposes.
+	class IDXDeviceManager {
 		friend Presenter;
 		friend Technique;
 		friend Creating;
@@ -15,21 +16,22 @@ namespace CA4G {
 		friend Signal;
 		template<typename ...PSS> friend class StaticPipelineBindings;
 	protected:
-		void* __InternalDXWrapper;
+		// Gets the internal DX12 core object
+		DX_Wrapper* __InternalDXWrapper;
 
 	public:
 		// Gets the current render target active in the swapchain
 		gObj<Texture2D> GetRenderTarget();
 	};
 
-	// Represents a internally managed wrapper for a DX cmd list.
-	class ICmdWrapper {
+	// Represents the object manages a DX12 command list internally for populating purposes.
+	class ICmdManager {
 		friend GPUScheduler;
 		friend CopyManager;
 		friend GraphicsManager;
-		template<typename ...PSS> friend class StaticPipelineBindings;
+		friend StaticPipelineBindingsBase;
 	protected:
-		void* __InternalDXCmdWrapper;
+		DX_CmdWrapper* __InternalDXCmdWrapper;
 	};
 
 	// Represents the different engines can be used to work with the GPU.
@@ -45,11 +47,16 @@ namespace CA4G {
 	};
 
 	class IPipelineBindings {
+		friend Creating;
+		friend Dispatcher;
+		friend CopyManager;
+		friend GraphicsManager;
+		friend RaytracingManager;
 	protected:
 		virtual Engine GetEngine() = 0;
-		virtual void OnLoad(IDXWrapper* dxWrapper) = 0;
-		virtual void OnSet(ICmdWrapper* cmdWrapper) = 0;
-		virtual void OnDispatch(ICmdWrapper* cmdWrapper) = 0;
+		virtual void OnCreate(DX_Wrapper* dxWrapper) = 0;
+		virtual void OnSet(ICmdManager* cmdWrapper) = 0;
+		virtual void OnDispatch(ICmdManager* cmdWrapper) = 0;
 	};
 
 	enum class EngineMask : int {
@@ -64,7 +71,7 @@ namespace CA4G {
 		friend Dispatcher;
 		friend GPUScheduler;
 	private:
-		Signal(void* scheduler, long rallyPoints[4]) {
+		Signal(GPUScheduler* scheduler, long rallyPoints[4]) {
 			this->scheduler = scheduler;
 			this->rallyPoints[0] = rallyPoints[0];
 			this->rallyPoints[1] = rallyPoints[1];
@@ -72,13 +79,13 @@ namespace CA4G {
 			this->rallyPoints[3] = rallyPoints[3];
 		}
 		long rallyPoints[4] = { };
-		void* scheduler = nullptr;
+		GPUScheduler* scheduler = nullptr;
 	public:
 		Signal() {}
 		void WaitFor();
 	};
 
-	class Technique : public IDXWrapper {
+	class Technique : public IDXDeviceManager {
 		friend Presenter;
 		friend ResourceView;
 		friend Buffer;
@@ -87,7 +94,7 @@ namespace CA4G {
 		friend Texture3D;
 		friend Creating;
 
-		void OnCreate(void* deviceWrapper) {
+		void OnCreate(DX_Wrapper* deviceWrapper) {
 			this->__InternalDXWrapper = deviceWrapper;
 		}
 
@@ -98,8 +105,8 @@ namespace CA4G {
 
 		class Setting {
 			friend Technique;
-			IDXWrapper* wrapper;
-			Setting(IDXWrapper* wrapper) :wrapper(wrapper) {}
+			IDXDeviceManager* manager;
+			Setting(IDXDeviceManager* manager) :manager(manager) {}
 			
 			void Tag(Tagging data);
 
@@ -123,8 +130,8 @@ namespace CA4G {
 		friend Presenter;
 		friend Technique;
 
-		IDXWrapper* wrapper;
-		Creating(IDXWrapper* wrapper) :wrapper(wrapper) {}
+		IDXDeviceManager* manager;
+		Creating(IDXDeviceManager* manager) :manager(manager) {}
 
 		// Tool method generic to create DX12 resources
 		gObj<ResourceView> CreateDXResource(int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
@@ -136,6 +143,9 @@ namespace CA4G {
 		// Creates a technique of specific type and passing some arguments to the constructor.
 		template<typename T, typename... A>
 		gObj<T> TechniqueObj(A... args);
+
+		template<typename T, typename... A>
+		gObj<T> Pipeline(A... args);
 
 		Signal FlushAndSignal(EngineMask mask = EngineMask::All);
 
@@ -284,8 +294,8 @@ namespace CA4G {
 		friend Presenter;
 		friend Technique;
 
-		IDXWrapper* wrapper;
-		Loading(IDXWrapper* wrapper) : wrapper(wrapper) {}
+		IDXDeviceManager* manager;
+		Loading(IDXDeviceManager* manager) : manager(manager) {}
 	public:
 		void TechniqueObj(gObj<Technique> technique) {
 			technique->OnLoad();
@@ -295,8 +305,15 @@ namespace CA4G {
 	template<typename T, typename... A>
 	gObj<T> Creating::TechniqueObj(A... args) {
 		auto subTechnique = new T(args...);
-		subTechnique->OnCreate(wrapper->__InternalDXWrapper);
+		subTechnique->OnCreate(manager->__InternalDXWrapper);
 		return subTechnique;
+	}
+
+	template<typename T, typename... A>
+	gObj<T> Creating::Pipeline(A... args) {
+		auto pipeline = new T(args...);
+		pipeline->OnCreate(manager->__InternalDXWrapper);
+		return pipeline; 
 	}
 }
 

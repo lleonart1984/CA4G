@@ -268,7 +268,7 @@ namespace CA4G {
 	};
 
 	class ResourceView {
-		friend ICmdWrapper;
+		friend ICmdManager;
 		friend Technique;
 		friend Creating;
 		friend CommandListManager;
@@ -279,11 +279,11 @@ namespace CA4G {
 
 	protected:
 		// Internal object used to wrap a DX resource
-		void* __InternalDXWrapper = nullptr;
+		DX_ResourceWrapper* __InternalDXWrapper = nullptr;
 
-		void* __InternalViewWrapper = nullptr;
+		DX_ViewWrapper* __InternalViewWrapper = nullptr;
 
-		ResourceView(void* internalDXWrapper, void* internalViewWrapper);
+		ResourceView(DX_ResourceWrapper* internalDXWrapper, DX_ViewWrapper* internalViewWrapper);
 
 	public:
 		void SetDebugName(LPCWSTR name);
@@ -310,8 +310,8 @@ namespace CA4G {
 
 	protected:
 		Buffer(
-			void* internalDXWrapper, 
-			void* internalViewWrapper, 
+			DX_ResourceWrapper* internalDXWrapper, 
+			DX_ViewWrapper* internalViewWrapper, 
 			int stride, 
 			int elementCount) : 
 			ResourceView(internalDXWrapper, internalViewWrapper),
@@ -337,8 +337,8 @@ namespace CA4G {
 
 	protected:
 		Texture1D(
-			void* internalDXWrapper,
-			void* internalViewWrapper, 
+			DX_ResourceWrapper* internalDXWrapper,
+			DX_ViewWrapper* internalViewWrapper, 
 			DXGI_FORMAT format, 
 			int width, 
 			int mips, 
@@ -377,8 +377,8 @@ namespace CA4G {
 
 	protected:
 		Texture2D(
-			void* internalDXWrapper,
-			void* internalViewWrapper, 
+			DX_ResourceWrapper* internalDXWrapper,
+			DX_ViewWrapper* internalViewWrapper, 
 			DXGI_FORMAT format, 
 			int width, 
 			int height, 
@@ -420,8 +420,8 @@ namespace CA4G {
 
 	protected:
 		Texture3D(
-			void* internalDXWrapper,
-			void* internalViewWrapper, 
+			DX_ResourceWrapper* internalDXWrapper,
+			DX_ViewWrapper* internalViewWrapper, 
 			DXGI_FORMAT format, 
 			int width, 
 			int height, 
