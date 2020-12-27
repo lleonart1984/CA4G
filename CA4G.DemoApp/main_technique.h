@@ -66,7 +66,7 @@ public:
 					VertexElement { VertexElementType::Float, 3, "POSITION" }
 				});
 			//__set NoDepthTest();
-			//__set CullMode();
+			//__set CullMode(D3D12_CULL_MODE_FRONT);
 			//__set FillMode();
 		}
 
@@ -76,30 +76,44 @@ public:
 			binder _set PixelShaderBindings();
 			binder _set SRV(0, Texture);
 
-			binder _set SMP_Static(0, Sampler::PointWithoutMipMaps());
+			binder _set SMP_Static(0, Sampler::Linear());
 		}
 	};
 	gObj<Pipeline> pipeline;
+	gObj<Texture2D> texture;
 
 	// Inherited via Technique
 	void OnLoad() override {
 		vertexBuffer = __create Buffer_VB<Vertex>(4);
-		indexBuffer = __create Buffer_IB<int>(6);
-		pipeline = __create Pipeline<Pipeline>();
-		
-		__dispatch member_collector(CreateAssets);
-	}
-
-	void CreateAssets(gObj<CopyManager> manager) {
-		manager _copy List(vertexBuffer, {
+		vertexBuffer _copy FromList({
 			Vertex { float3(-1, -1, 0.5) },
 			Vertex { float3(1, -1, 0.5) },
 			Vertex { float3(1, 1, 0.5) },
 			Vertex { float3(-1, 1, 0.5) }
 			});
-		manager _copy List(indexBuffer, {
+
+		indexBuffer = __create Buffer_IB<int>(6);
+		indexBuffer _copy FromList({
 			 0, 1, 2, 0, 2, 3
 			});
+
+		texture = __create Texture2D_SRV<float4>(2, 2, 2, 1);
+		float4 pixels[] = {
+				float4(1,0,0,1), float4(1,1,0,1),
+				float4(0,1,0,1), float4(0,0,1,1),
+				float4(1,0,1,1)
+		};
+		texture _copy FromPtr((byte*)pixels);
+
+		pipeline = __create Pipeline<Pipeline>();
+		
+		__dispatch member_collector(LoadAssets);
+	}
+
+	void LoadAssets(gObj<CopyManager> manager) {
+		manager _load AllToGPU(vertexBuffer);
+		manager _load AllToGPU(indexBuffer);
+		manager _load AllToGPU(texture);
 	}
 
 	void OnDispatch() override {
@@ -110,14 +124,15 @@ public:
 		static int frame = 0;
 		frame++;
 		pipeline->RenderTarget = render_target;
+		pipeline->Texture = texture;
 		manager _set Pipeline(pipeline);
-		manager _set VertexBuffer(vertexBuffer _create Slice(1, 3));
+		manager _set VertexBuffer(vertexBuffer);
 		manager _set IndexBuffer(indexBuffer);
 		manager _set Viewport(render_target->Width, render_target->Height);
 		
 		manager _clear RT(render_target, float3(0.2f, sin(frame*0.001), 0.5f));
 
-		manager _dispatch IndexedTriangles(3);
+		manager _dispatch IndexedTriangles(6);
 	}
 
 };

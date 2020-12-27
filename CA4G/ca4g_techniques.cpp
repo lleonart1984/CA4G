@@ -9,6 +9,9 @@ namespace CA4G {
 		int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
 		D3D12_CLEAR_VALUE* clearing, CPUAccessibility cpuAccessibility)
 	{
+		if (elementWidth == 0)
+			elementWidth = DX_ResourceWrapper::SizeOfFormatElement(desc.Format);
+
 		DX_Wrapper* w = manager->__InternalDXWrapper;
 		auto device = w->device;
 
@@ -161,7 +164,7 @@ namespace CA4G {
 		desc.Alignment = 0;
 		desc.DepthOrArraySize = arrayLength;
 		desc.MipLevels = min(mips, MaxMipsFor(min(width, height)));
-		desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		desc.SampleDesc = { 1, 0 };
 	}
 
@@ -208,7 +211,7 @@ namespace CA4G {
 		desc.Alignment = 0;
 		desc.DepthOrArraySize = slices;
 		desc.MipLevels = min(mips, MaxMipsFor(min(min(width, height), slices)));
-		desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		desc.SampleDesc = { 1, 0 };
 	}
 

@@ -81,11 +81,11 @@ namespace CA4G {
 	class CopyManager : public CommandListManager {
 		friend GPUScheduler;
 	protected:
-		CopyManager():clear(new Clearing(this)), copy(new Copying(this)){}
+		CopyManager():clear(new Clearing(this)), load(new Loading(this)){}
 	public:
 		~CopyManager() {
 			delete clear;
-			delete copy;
+			delete load;
 		}
 
 		// Allows access to all clearing functions for Resources
@@ -115,97 +115,26 @@ namespace CA4G {
 		* const clear;
 
 		// Allows access to all copying functions from and to Resources
-		class Copying {
+		class Loading {
 			friend CopyManager;
 
 			ICmdManager* wrapper;
 
-			void FastCopyToStart(gObj<ResourceView> dst, byte* data, long size);
-
-			void FastCopyFromStart(gObj<ResourceView> dst, byte* data, long size);
-
-			// Data is given by a reference using a pointer
-			void FullCopyToSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box = nullptr);
-
-			void FullCopyFromSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box = nullptr);
-			
-			Copying(ICmdManager* wrapper) : wrapper(wrapper) {}
+			Loading(ICmdManager* wrapper) : wrapper(wrapper) {}
 
 		public:
+			// Updates all subresources from mapped memory to the gpu
+			void AllToGPU(gObj<ResourceView> resource);
+			// Updates all subresources from the gpu to mapped memory
+			void AllFromGPU(gObj<ResourceView> resource);
 
-			// Copies the data from a ptr to the buffer
-			template<typename T>
-			void Ptr(gObj<Buffer> dst, T* data) {
-				FastCopyToStart(dst, data, dst->getSizeInBytes());
-			}
-
-
-			// Copies the data from a ptr to the buffer at specific range
-			template<typename T>
-			void Ptr(gObj<Buffer> dst, T* data, int offset = 0, int size = -1) {
-				if (size == -1)
-					size = dst->getSizeInBytes() - offset;
-
-				FullCopyToSubresource(dst, data, D3D12_BOX{
-						offset, 0, 0,
-						offset + size, 1, 1
-					});
-			}
-
-			// Copies the data from a ptr to a specific subresource at specific region
-			template<typename T>
-			void Ptr(gObj<Texture1D> dst, int mip, int slice, T* data, const D3D12_BOX* box = nullptr) {
-				gObj<Texture1D> subresource = dst->SliceArray(slice, 1)->SliceMips(mip, 1);
-				FullCopyToSubresource(subresource, data, box);
-			}
-
-			// Copies the data from a ptr to a specific subresource at specific region
-			template<typename T>
-			void Ptr(gObj<Texture2D> dst, int mip, int slice, T* data, const D3D12_BOX* box = nullptr) {
-				gObj<Texture2D> subresource = dst->SliceArray(slice, 1)->SliceMips(mip, 1);
-				FullCopyToSubresource(subresource, data, box);
-			}
-
-			// Copies the data from a ptr to a specific subresource at specific region
-			template<typename T>
-			void Ptr(gObj<Texture3D> dst, int mip, T* data, const D3D12_BOX* box = nullptr) {
-				gObj<Texture2D> subresource = dst->SliceMips(mip, 1);
-				FullCopyToSubresource(subresource, data, box);
-			}
-
-			// Copies the data from a ptr to a full resource 
-			template<typename T>
-			void Ptr(gObj<Texture1D> dst, T* data) {
-				FullCopyToSubresource(dst, data, nullptr);
-			}
-
-			// Copies the data from a ptr to a full resource
-			template<typename T>
-			void Ptr(gObj<Texture2D> dst, T* data) {
-				FullCopyToSubresource(dst, data, nullptr);
-			}
-
-			// Copies the data from a ptr to a full resource
-			template<typename T>
-			void Ptr(gObj<Texture3D> dst, T* data) {
-				FullCopyToSubresource(dst, data, nullptr);
-			}
-
-			// Data is given by an initializer list
-			template<typename T>
-			void List(gObj<Buffer> dst, std::initializer_list<T> data) {
-				FastCopyToStart(dst, (byte*)data.begin(), dst->getSizeInBytes());
-			}
-
-			// Data is given expanded in a value object
-			template<typename T>
-			void Value(gObj<Buffer> dst, const T& data) {
-				FastCopyToStart(dst, &data);
-			}
-
-			void Resource(gObj<ResourceView> dst, gObj<ResourceView> src);
+			// Updates a region of a single subresource from mapped memory to the gpu
+			void RegionToGPU(gObj<ResourceView> singleSubresource, const D3D12_BOX &region);
+			
+			// Updates a region of a single subresource from the gpu to mapped memory
+			void RegionFromGPU(gObj<ResourceView> singleSubresource, const D3D12_BOX &region);
 		}
-		* const copy;
+		* const load;
 	};
 
 	class ComputeManager : public CopyManager

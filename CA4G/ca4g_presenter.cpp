@@ -139,9 +139,315 @@ namespace CA4G {
 		return ResolveNullView(this, D3D12_RESOURCE_DIMENSION_TEXTURE2D)->__InternalViewWrapper->getRTVHandle();
 	}
 
-
 #pragma endregion
 
+#pragma region DX_ResourceWrapper
+
+	void DX_ResourceWrapper::WriteToMapped(byte* data, DX_ViewWrapper* view, bool flipRows) {
+		__ResolveUploading();
+
+		switch (desc.Dimension)
+		{
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			memcpy(
+				permanentUploadingMap + view->arrayStart * elementStride,
+				data,
+				view->arrayCount * elementStride
+			);
+			break;
+		default:
+			byte* source = data;
+			for (int a = 0; a < view->arrayCount; a++)
+				for (int m = 0; m < view->mipCount; m++)
+				{
+					int index = (view->arrayStart + a) * (desc.MipLevels) + m + view->mipStart;
+
+					auto subresourceFootprint = pLayouts[index].Footprint;
+
+					D3D12_SUBRESOURCE_DATA sourceData;
+					sourceData.pData = source;
+					sourceData.RowPitch = subresourceFootprint.Width * elementStride;
+					sourceData.SlicePitch = subresourceFootprint.Width * subresourceFootprint.Height * elementStride;
+
+					D3D12_MEMCPY_DEST destData;
+					destData.pData = permanentUploadingMap + pLayouts[index].Offset;
+					destData.RowPitch = subresourceFootprint.RowPitch;
+					destData.SlicePitch = subresourceFootprint.RowPitch * subresourceFootprint.Height;
+
+					MemcpySubresource(&destData, &sourceData,
+						subresourceFootprint.Width * elementStride,
+						subresourceFootprint.Height,
+						subresourceFootprint.Depth,
+						flipRows
+					);
+
+					source += subresourceFootprint.Depth * subresourceFootprint.Height * subresourceFootprint.Width * elementStride;
+				}
+			break;
+		}
+	}
+
+	void DX_ResourceWrapper::UpdateResourceFromMapped(DX_CommandList cmdList, DX_ViewWrapper* view) {
+		if (cpuaccess == CPUAccessibility::Write) // writable resource dont need to update.
+			return;
+
+		switch (desc.Dimension)
+		{
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			cmdList->CopyBufferRegion(resource, view->arrayStart * elementStride, uploading, view->arrayStart * elementStride, view->arrayCount * elementStride);
+			break;
+		default:
+			// Update slice region from uploading version to resource.
+			for (int a = 0; a < view->arrayCount; a++)
+				for (int m = 0; m < view->mipCount; m++)
+				{
+					int index = (view->arrayStart + a) * (desc.MipLevels) + m + view->mipStart;
+
+					auto subresourceFootprint = pLayouts[index].Footprint;
+
+					D3D12_TEXTURE_COPY_LOCATION dstData;
+					dstData.pResource = resource;
+					dstData.SubresourceIndex = index;
+					dstData.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+					D3D12_TEXTURE_COPY_LOCATION srcData;
+					srcData.pResource = uploading;
+					srcData.PlacedFootprint = pLayouts[index];
+					srcData.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+
+					cmdList->CopyTextureRegion(&dstData, 0, 0, 0, &srcData, nullptr);
+				}
+			break;
+		}
+	}
+
+	void DX_ResourceWrapper::ReadFromMapped(byte* data, DX_ViewWrapper* view, bool flipRows) {
+		// It is not necessary unless the data is in readback heap, in that case
+		// only sets the downloading version to be the same resource, and maps.
+		__ResolveDownloading();
+
+		switch (desc.Dimension) {
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			memcpy(
+				data,
+				permanentDownloadingMap + view->arrayStart * elementStride,
+				view->arrayCount * elementStride
+			);
+			break;
+		default:
+			byte* destination = data;
+			for (int a = 0; a < view->arrayCount; a++)
+				for (int m = 0; m < view->mipCount; m++)
+				{
+					int index = (view->arrayStart + a) * (desc.MipLevels) + m + view->mipStart;
+
+					auto subresourceFootprint = pLayouts[index].Footprint;
+
+					D3D12_SUBRESOURCE_DATA sourceData;
+					sourceData.pData = permanentDownloadingMap + pLayouts[index].Offset;
+					sourceData.RowPitch = subresourceFootprint.RowPitch;
+					sourceData.SlicePitch = subresourceFootprint.RowPitch * subresourceFootprint.Height;
+
+					D3D12_MEMCPY_DEST destData;
+					destData.pData = destination;
+					destData.RowPitch = subresourceFootprint.Width * elementStride;
+					destData.SlicePitch = subresourceFootprint.Width * subresourceFootprint.Height * elementStride;
+
+					MemcpySubresource(&destData, &sourceData,
+						subresourceFootprint.RowPitch,
+						subresourceFootprint.Height,
+						subresourceFootprint.Depth,
+						flipRows
+					);
+
+					destination += subresourceFootprint.Depth * subresourceFootprint.Height * subresourceFootprint.RowPitch;
+				}
+			break;
+		}
+	}
+
+	void DX_ResourceWrapper::UpdateMappedFromResource(DX_CommandList cmdList, DX_ViewWrapper* view)
+	{
+		if (cpuaccess == CPUAccessibility::Read) // readable resource dont need to update.
+			return;
+
+		switch (desc.Dimension)
+		{
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			cmdList->CopyBufferRegion(downloading, view->arrayStart * elementStride, resource, view->arrayStart * elementStride, view->arrayCount * elementStride);
+			break;
+		default:
+			// Update slice region from uploading version to resource.
+			for (int a = 0; a < view->arrayCount; a++)
+				for (int m = 0; m < view->mipCount; m++)
+				{
+					int index = (view->arrayStart + a) * (desc.MipLevels) + m + view->mipStart;
+
+					auto subresourceFootprint = pLayouts[index].Footprint;
+
+					D3D12_TEXTURE_COPY_LOCATION dstData;
+					dstData.pResource = resource;
+					dstData.SubresourceIndex = index;
+					dstData.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+					D3D12_TEXTURE_COPY_LOCATION srcData;
+					srcData.pResource = uploading;
+					srcData.PlacedFootprint = pLayouts[index];
+					srcData.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+
+					cmdList->CopyTextureRegion(&dstData, 0, 0, 0, &srcData, nullptr);
+				}
+			break;
+		}
+	}
+
+	void DX_ResourceWrapper::WriteRegionToMappedSubresource(byte* data, DX_ViewWrapper* view, const D3D12_BOX &region, bool flipRows) {
+		__ResolveUploading();
+
+		switch (desc.Dimension)
+		{
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			memcpy(
+				permanentUploadingMap + (view->arrayStart + region.left) * elementStride,
+				data,
+				(region.right - region.left) * elementStride
+			);
+			break;
+		default:
+			byte* source = data;
+			int index = (view->arrayStart) * (desc.MipLevels) + view->mipStart;
+
+			auto subresourceFootprint = pLayouts[index].Footprint;
+
+			D3D12_SUBRESOURCE_DATA sourceData;
+			sourceData.pData = source;
+			sourceData.RowPitch = (region.right - region.left) * elementStride;
+			sourceData.SlicePitch = (region.right - region.left) * (region.bottom - region.top) * elementStride;
+
+			D3D12_MEMCPY_DEST destData;
+			destData.pData = permanentUploadingMap + pLayouts[index].Offset
+				+ region.front * subresourceFootprint.RowPitch * subresourceFootprint.Height
+				+ region.top * subresourceFootprint.RowPitch
+				+ region.left * elementStride;
+			destData.RowPitch = subresourceFootprint.RowPitch;
+			destData.SlicePitch = subresourceFootprint.RowPitch * subresourceFootprint.Height;
+
+			MemcpySubresource(&destData, &sourceData,
+				(region.right - region.left) * elementStride,
+				(region.bottom - region.top),
+				(region.back - region.front),
+				flipRows
+			);
+			break;
+		}
+	}
+
+	void DX_ResourceWrapper::UpdateRegionFromUploading(DX_CommandList cmdList, DX_ViewWrapper* view, const D3D12_BOX &region)
+	{
+		if (cpuaccess == CPUAccessibility::Write) // writable resource dont need to update.
+			return;
+
+		switch (desc.Dimension)
+		{
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			cmdList->CopyBufferRegion(
+				resource, (view->arrayStart + region.left) * elementStride,
+				uploading, (view->arrayStart + region.left) * elementStride, (region.right - region.left) * elementStride);
+			break;
+		default:
+			// Update slice region from uploading version to resource.
+			int index = view->arrayStart * desc.MipLevels + view->mipStart;
+
+			auto subresourceFootprint = pLayouts[index].Footprint;
+
+			D3D12_TEXTURE_COPY_LOCATION dstData;
+			dstData.pResource = resource;
+			dstData.SubresourceIndex = index;
+			dstData.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+			D3D12_TEXTURE_COPY_LOCATION srcData;
+			srcData.pResource = uploading;
+			srcData.PlacedFootprint = pLayouts[index];
+			srcData.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+
+			cmdList->CopyTextureRegion(&dstData, region.left, region.top, region.front, &srcData, &region);
+			break;
+		}
+	}
+
+	void DX_ResourceWrapper::ReadRegionFromMappedSubresource(byte* data, DX_ViewWrapper* view, const D3D12_BOX &region, bool flipRows) {
+		__ResolveDownloading();
+
+		switch (desc.Dimension) {
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			memcpy(
+				data,
+				permanentDownloadingMap + (view->arrayStart + region.left) * elementStride,
+				(region.right - region.left) * elementStride
+			);
+			break;
+		default:
+			byte* destination = data;
+			int index = (view->arrayStart) * (desc.MipLevels) + view->mipStart;
+
+			auto subresourceFootprint = pLayouts[index].Footprint;
+
+			D3D12_SUBRESOURCE_DATA sourceData;
+			sourceData.pData = permanentDownloadingMap + pLayouts[index].Offset
+				+ region.front * subresourceFootprint.Height * subresourceFootprint.RowPitch
+				+ region.top * subresourceFootprint.RowPitch
+				+ region.left * elementStride;
+			sourceData.RowPitch = subresourceFootprint.RowPitch;
+			sourceData.SlicePitch = subresourceFootprint.RowPitch * subresourceFootprint.Height;
+
+			D3D12_MEMCPY_DEST destData;
+			destData.pData = destination;
+			destData.RowPitch = (region.right - region.left) * elementStride;
+			destData.SlicePitch = (region.right - region.left) * (region.bottom - region.top) * elementStride;
+
+			MemcpySubresource(&destData, &sourceData,
+				destData.RowPitch,
+				(region.bottom - region.top),
+				(region.back - region.front),
+				flipRows
+			);
+			break;
+		}
+	}
+
+	void DX_ResourceWrapper::UpdateRegionToDownloading(DX_CommandList cmdList, DX_ViewWrapper* view, const D3D12_BOX &region) {
+		if (cpuaccess == CPUAccessibility::Read) // readable resource dont need to update.
+			return;
+
+		switch (desc.Dimension)
+		{
+		case D3D12_RESOURCE_DIMENSION_BUFFER:
+			cmdList->CopyBufferRegion(
+				downloading, (view->arrayStart + region.left) * elementStride,
+				resource, (view->arrayStart + region.left) * elementStride, (region.right - region.left) * elementStride);
+			break;
+		default:
+			// Update slice region from uploading version to resource.
+			int index = view->arrayStart * desc.MipLevels + view->mipStart;
+
+			auto subresourceFootprint = pLayouts[index].Footprint;
+
+			D3D12_TEXTURE_COPY_LOCATION dstData;
+			dstData.pResource = downloading;
+			dstData.PlacedFootprint = pLayouts[index];
+			dstData.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+			D3D12_TEXTURE_COPY_LOCATION srcData;
+			srcData.pResource = uploading;
+			srcData.SubresourceIndex = index;
+			srcData.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+
+			cmdList->CopyTextureRegion(&dstData, region.left, region.top, region.front, &srcData, &region);
+			break;
+		}
+	}
+
+#pragma endregion
 
 #pragma region Clearing
 
@@ -157,27 +463,24 @@ namespace CA4G {
 
 #pragma region Copy Manager
 
-	void CopyManager::Copying::FastCopyToStart(gObj<ResourceView> dst, byte* data, long size) {
-		auto resource = (DX_ResourceWrapper*)dst->__InternalDXWrapper;
-		auto view = (DX_ViewWrapper*)dst->__InternalViewWrapper;
-		int subresource = resource->desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ?
-			view->mipStart :
-			view->mipStart + (view->arrayStart * resource->desc.MipLevels);
-		resource->UploadToSubresource0(resource->pLayouts[subresource].Offset, (byte*)data, size);
-		resource->GrantGPUAccess(((DX_CmdWrapper*)this->wrapper->__InternalDXCmdWrapper)->cmdList);
+	void CopyManager::Loading::AllToGPU(gObj<ResourceView> resource) {
+		resource->__InternalDXWrapper->UpdateResourceFromMapped(this->wrapper->__InternalDXCmdWrapper->cmdList, resource->__InternalViewWrapper);
 	}
 
-	void CopyManager::Copying::FullCopyToSubresource(gObj<ResourceView> dst, byte* data, const D3D12_BOX* box)
-	{
-		auto resource = (DX_ResourceWrapper*)dst->__InternalDXWrapper;
-		
-		if (box != nullptr) // region inside subresource
-		{ // Only copy region
-			
-		}
-		else { // copy all subresources of the view/slice
+	void CopyManager::Loading::AllFromGPU(gObj<ResourceView> resource) {
+		resource->__InternalDXWrapper->UpdateMappedFromResource(this->wrapper->__InternalDXCmdWrapper->cmdList, resource->__InternalViewWrapper);
+	}
 
-		}
+	void CopyManager::Loading::RegionToGPU(gObj<ResourceView> singleSubresource, const D3D12_BOX &region)
+	{
+		singleSubresource->__InternalDXWrapper->UpdateRegionFromUploading(wrapper->__InternalDXCmdWrapper->cmdList,
+			singleSubresource->__InternalViewWrapper, region);
+	}
+
+	void CopyManager::Loading::RegionFromGPU(gObj<ResourceView> singleSubresource, const D3D12_BOX& region)
+	{
+		singleSubresource->__InternalDXWrapper->UpdateRegionToDownloading(wrapper->__InternalDXCmdWrapper->cmdList,
+			singleSubresource->__InternalViewWrapper, region);
 	}
 
 #pragma endregion
@@ -394,18 +697,18 @@ namespace CA4G {
 					}
 					auto manager = Engines[e].threadInfos[t].manager;
 
-					//// Copy all collected descriptors from non-visible to visible DHs.
-					//if (manager->srcDescriptors.size() > 0)
-					//{
-					//	this->manager->device->CopyDescriptors(
-					//		manager->dstDescriptors.size(), &manager->dstDescriptors.first(), &manager->dstDescriptorRangeLengths.first(),
-					//		manager->srcDescriptors.size(), &manager->srcDescriptors.first(), nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-					//	);
-					//	// Clears the lists for next usage
-					//	manager->srcDescriptors.reset();
-					//	manager->dstDescriptors.reset();
-					//	manager->dstDescriptorRangeLengths.reset();
-					//}
+					// Copy all collected descriptors from non-visible to visible DHs.
+					if (manager->__InternalDXCmdWrapper->srcDescriptors.size() > 0)
+					{
+						dxWrapper->device->CopyDescriptors(
+							manager->__InternalDXCmdWrapper->dstDescriptors.size(), &manager->__InternalDXCmdWrapper->dstDescriptors.first(), &manager->__InternalDXCmdWrapper->dstDescriptorRangeLengths.first(),
+							manager->__InternalDXCmdWrapper->srcDescriptors.size(), &manager->__InternalDXCmdWrapper->srcDescriptors.first(), nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+						);
+						// Clears the lists for next usage
+						manager->__InternalDXCmdWrapper->srcDescriptors.reset();
+						manager->__InternalDXCmdWrapper->dstDescriptors.reset();
+						manager->__InternalDXCmdWrapper->dstDescriptorRangeLengths.reset();
+					}
 				}
 
 				if (activeCmdLists > 0) // some cmdlist to execute

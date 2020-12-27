@@ -4,7 +4,8 @@ namespace CA4G {
 
 	ResourceView::ResourceView(DX_ResourceWrapper* internalDXWrapper, DX_ViewWrapper* internalViewWrapper)
 		: __InternalDXWrapper(internalDXWrapper),
-		__InternalViewWrapper(internalViewWrapper) {
+		__InternalViewWrapper(internalViewWrapper),
+	copy(new Copying(this)){
 
 		DX_ViewWrapper* view = internalViewWrapper ? internalViewWrapper : new DX_ViewWrapper(internalDXWrapper);
 		__InternalViewWrapper = view;
@@ -21,6 +22,10 @@ namespace CA4G {
 			view->mipCount = desc.MipLevels;
 			view->ViewDimension = desc.Dimension;
 		}
+	}
+
+	ResourceView::Copying::Copying(ResourceView* resource):resource(resource)
+	{
 	}
 
 	gObj<ResourceView> CA4G::ResourceView::CreateNullView(DX_Wrapper* deviceManager, D3D12_RESOURCE_DIMENSION dimension)
@@ -54,6 +59,23 @@ namespace CA4G {
 
 	CPUAccessibility ResourceView::getCPUAccessibility() {
 		return __InternalResourceState->cpuaccess;
+	}
+
+	void ResourceView::Copying::FromPtr(byte* data, bool flipRows) {
+		resource->__InternalDXWrapper->WriteToMapped(data, resource->__InternalViewWrapper, flipRows);
+	}
+
+	void ResourceView::Copying::ToPtr(byte* data, bool flipRows) {
+		resource->__InternalDXWrapper->ReadFromMapped(data, resource->__InternalViewWrapper, flipRows);
+	}
+
+	void ResourceView::Copying::RegionFromPtr(byte* data, const D3D12_BOX& region, bool flipRows) {
+		resource->__InternalDXWrapper->WriteRegionToMappedSubresource(data, resource->__InternalViewWrapper, region, flipRows);
+	}
+
+	void ResourceView::Copying::RegionToPtr(byte* data, const D3D12_BOX& region, bool flipRows)
+	{
+		resource->__InternalDXWrapper->ReadRegionFromMappedSubresource(data, resource->__InternalViewWrapper, region, flipRows);
 	}
 
 	gObj<Buffer> Buffer::Creating::Slice(int startElement, int count) {

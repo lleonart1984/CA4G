@@ -309,6 +309,27 @@ namespace CA4G {
 		long getSizeInBytes();
 
 		virtual ~ResourceView();
+		
+		class Copying {
+			friend ResourceView;
+		private:
+			ResourceView* resource;
+			Copying(ResourceView* resource);
+
+		public:
+			void FromPtr(byte* data, bool flipRows = false);
+			void ToPtr(byte* data, bool flipRows = false);
+			void RegionFromPtr(byte* data, const D3D12_BOX &region, bool flipRows = false);
+			void RegionToPtr(byte* data, const D3D12_BOX& region, bool flipRows = false);
+			template<typename T>
+			void FromList(std::initializer_list<T> data) {
+				FromPtr((byte*)data.begin());
+			}
+			template<typename T>
+			void FromValue(const T& elementValue) {
+				FromPtr(&elementValue);
+			}
+		} * const copy;
 	};
 
 	class Buffer : public ResourceView {

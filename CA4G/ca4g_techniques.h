@@ -232,7 +232,7 @@ namespace CA4G {
 		// if mips == 0 all possible mips are allocated.
 		template<typename T>
 		gObj<Texture1D> Texture1D_UAV(int width, int mips = 0, int arrayLength = 1) {
-			return Texture1D_UAV(Formats<T>::format, width, mips, arrayLength);
+			return Texture1D_UAV(Formats<T>::Value, width, mips, arrayLength);
 		}
 
 		// Creates a bidimensional texture to be used as a Texture2D in a shader.
@@ -242,7 +242,7 @@ namespace CA4G {
 		// if mips == 0 all possible mips are allocated.
 		template<typename T>
 		gObj<Texture2D> Texture2D_SRV(int width, int height, int mips = 0, int arrayLength = 1) {
-			return Texture2D_SRV(Formats<T>::format, width, height, mips, arrayLength);
+			return Texture2D_SRV(Formats<T>::Value, width, height, mips, arrayLength);
 		}
 
 		// Creates a bidimensional texture to be used as a RWTexture2D in a shader or a render target.
@@ -252,7 +252,7 @@ namespace CA4G {
 		// if mips == 0 all possible mips are allocated.
 		template<typename T>
 		gObj<Texture2D> Texture2D_UAV(int width, int height, int mips = 0, int arrayLength = 1) {
-			return Texture2D_UAV(Formats<T>::format, width, height, mips, arrayLength);
+			return Texture2D_UAV(Formats<T>::Value, width, height, mips, arrayLength);
 		}
 
 		// Creates a bidimensional texture to be used exclusively as a render target.
@@ -262,7 +262,7 @@ namespace CA4G {
 		// if mips == 0 all possible mips are allocated.
 		template<typename T>
 		gObj<Texture2D> Texture2D_RT(int width, int height, int mips = 0, int arrayLength = 1) {
-			return Texture2D_RT(Formats<T>::format, width, height, mips, arrayLength);
+			return Texture2D_RT(Formats<T>::Value, width, height, mips, arrayLength);
 		}
 
 		// Creates a bidimensional texture to be used as exclusively as DepthStencil Buffer.
@@ -275,7 +275,7 @@ namespace CA4G {
 		// if mips == 0 all possible mips are allocated.
 		template<typename T>
 		gObj<Texture3D> Texture3D_SRV(int width, int height, int depth, int mips = 0) {
-			return Texture3D_SRV(Formats<T>::format, width, height, depth, mips);
+			return Texture3D_SRV(Formats<T>::Value, width, height, depth, mips);
 		}
 
 		// Creates a threedimensional texture to be used as a RWTexture3D in a shader.
@@ -283,7 +283,7 @@ namespace CA4G {
 		// Creates a threedimensional texture to be used as a RWTexture3D in a shader.
 		template<typename T>
 		gObj<Texture3D> Texture3D_UAV(int width, int height, int depth, int mips = 0) {
-			return Texture3D_UAV(Formats<T>::format, width, height, depth, mips);
+			return Texture3D_UAV(Formats<T>::Value, width, height, depth, mips);
 		}
 
 #pragma endregion

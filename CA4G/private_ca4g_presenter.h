@@ -116,6 +116,86 @@ namespace CA4G {
 
 	struct DX_ResourceWrapper {
 
+		static int SizeOfFormatElement(DXGI_FORMAT format) {
+			switch (format) {
+			case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+			case DXGI_FORMAT_R32G32B32A32_FLOAT:
+			case DXGI_FORMAT_R32G32B32A32_UINT:
+			case DXGI_FORMAT_R32G32B32A32_SINT:
+				return 128 / 8;
+			case DXGI_FORMAT_R32G32B32_TYPELESS:
+			case DXGI_FORMAT_R32G32B32_FLOAT:
+			case DXGI_FORMAT_R32G32B32_UINT:
+			case DXGI_FORMAT_R32G32B32_SINT:
+				return 96 / 8;
+			case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+			case DXGI_FORMAT_R16G16B16A16_FLOAT:
+			case DXGI_FORMAT_R16G16B16A16_UNORM:
+			case DXGI_FORMAT_R16G16B16A16_UINT:
+			case DXGI_FORMAT_R16G16B16A16_SNORM:
+			case DXGI_FORMAT_R16G16B16A16_SINT:
+			case DXGI_FORMAT_R32G32_TYPELESS:
+			case DXGI_FORMAT_R32G32_FLOAT:
+			case DXGI_FORMAT_R32G32_UINT:
+			case DXGI_FORMAT_R32G32_SINT:
+			case DXGI_FORMAT_R32G8X24_TYPELESS:
+			case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+			case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+			case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+				return 64 / 8;
+			case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+			case DXGI_FORMAT_R10G10B10A2_UNORM:
+			case DXGI_FORMAT_R10G10B10A2_UINT:
+			case DXGI_FORMAT_R11G11B10_FLOAT:
+			case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+			case DXGI_FORMAT_R8G8B8A8_UNORM:
+			case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+			case DXGI_FORMAT_R8G8B8A8_UINT:
+			case DXGI_FORMAT_R8G8B8A8_SNORM:
+			case DXGI_FORMAT_R8G8B8A8_SINT:
+			case DXGI_FORMAT_R16G16_TYPELESS:
+			case DXGI_FORMAT_R16G16_FLOAT:
+			case DXGI_FORMAT_R16G16_UNORM:
+			case DXGI_FORMAT_R16G16_UINT:
+			case DXGI_FORMAT_R16G16_SNORM:
+			case DXGI_FORMAT_R16G16_SINT:
+			case DXGI_FORMAT_R32_TYPELESS:
+			case DXGI_FORMAT_D32_FLOAT:
+			case DXGI_FORMAT_R32_FLOAT:
+			case DXGI_FORMAT_R32_UINT:
+			case DXGI_FORMAT_R32_SINT:
+			case DXGI_FORMAT_R24G8_TYPELESS:
+			case DXGI_FORMAT_D24_UNORM_S8_UINT:
+			case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+			case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+			case DXGI_FORMAT_B8G8R8A8_UNORM:
+			case DXGI_FORMAT_B8G8R8X8_UNORM:
+				return 32 / 8;
+			case DXGI_FORMAT_R8G8_TYPELESS:
+			case DXGI_FORMAT_R8G8_UNORM:
+			case DXGI_FORMAT_R8G8_UINT:
+			case DXGI_FORMAT_R8G8_SNORM:
+			case DXGI_FORMAT_R8G8_SINT:
+			case DXGI_FORMAT_R16_TYPELESS:
+			case DXGI_FORMAT_R16_FLOAT:
+			case DXGI_FORMAT_D16_UNORM:
+			case DXGI_FORMAT_R16_UNORM:
+			case DXGI_FORMAT_R16_UINT:
+			case DXGI_FORMAT_R16_SNORM:
+			case DXGI_FORMAT_R16_SINT:
+			case DXGI_FORMAT_B5G6R5_UNORM:
+			case DXGI_FORMAT_B5G5R5A1_UNORM:
+				return 16 / 8;
+			case DXGI_FORMAT_R8_TYPELESS:
+			case DXGI_FORMAT_R8_UNORM:
+			case DXGI_FORMAT_R8_UINT:
+			case DXGI_FORMAT_R8_SNORM:
+			case DXGI_FORMAT_R8_SINT:
+			case DXGI_FORMAT_A8_UNORM:
+				return 8 / 8;
+			}
+		}
+
 		DX_ResourceWrapper(DX_Wrapper* wrapper, DX_Resource resource, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState, CPUAccessibility cpuAccessibility)
 			: device(wrapper->device), dxWrapper(wrapper), resource(resource), desc(desc)
 		{
@@ -155,8 +235,9 @@ namespace CA4G {
 		// Last used state of this resource on the GPU
 		D3D12_RESOURCE_STATES LastUsageState;
 
-		// For uploading data, a permanent CPU mapped version is cache to avoid several map overheads...
+		// For uploading/downloading data, a permanent CPU mapped version is cache to avoid several map overheads...
 		byte* permanentUploadingMap = nullptr;
+		byte* permanentDownloadingMap = nullptr;
 
 		inline D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() {
 			return resource->GetGPUVirtualAddress();
@@ -176,6 +257,30 @@ namespace CA4G {
 		// How many resource views are referencing this resource. This resource is automatically released by the last view using it
 		// when no view is referencing it.
 		int references = 0;
+
+		//---Copied from d3d12x.h----------------------------------------------------------------------------
+		// Row-by-row memcpy
+		inline void MemcpySubresource(
+			_In_ const D3D12_MEMCPY_DEST* pDest,
+			_In_ const D3D12_SUBRESOURCE_DATA* pSrc,
+			SIZE_T RowSizeInBytes,
+			UINT NumRows,
+			UINT NumSlices,
+			bool flipRows = false
+		)
+		{
+			for (UINT z = 0; z < NumSlices; ++z)
+			{
+				BYTE* pDestSlice = reinterpret_cast<BYTE*>(pDest->pData) + pDest->SlicePitch * z;
+				const BYTE* pSrcSlice = reinterpret_cast<const BYTE*>(pSrc->pData) + pSrc->SlicePitch * z;
+				for (UINT y = 0; y < NumRows; ++y)
+				{
+					memcpy(pDestSlice + pDest->RowPitch * y,
+						pSrcSlice + pSrc->RowPitch * (flipRows ? NumRows - y - 1 : y),
+						RowSizeInBytes);
+				}
+			}
+		}
 
 		// Resolves an uploading CPU-Writable version for this resource
 		void __ResolveUploading() {
@@ -251,222 +356,40 @@ namespace CA4G {
 						device->CreateCommittedResource(&downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
 							IID_PPV_ARGS(&downloading));
 					}
+
+					D3D12_RANGE range{ 0, pTotalSizes };
+
+					auto hr = downloading->Map(0, &range, (void**)&permanentDownloadingMap);
 				}
 
 				mutex.Release();
 			}
 		}
 
-		void UploadToSubresource0(long dstOffset, byte* data, long size) {
-			__ResolveUploading();
-			memcpy(permanentUploadingMap + dstOffset, (UINT8*)data, size);
-		}
+		// Writes data in specific subresources at mapped uploading memory
+		void WriteToMapped(byte* data, DX_ViewWrapper* view, bool flipRows = false);
 
-		void DownloadFromSubresource0(long srcOffset, long size, byte* dstData) {
-			__ResolveDownloading();
+		// copies de specific range of subresources from uploading to the gpu resource
+		void UpdateResourceFromMapped(DX_CommandList cmdList, DX_ViewWrapper* view);
 
-			mutex.Acquire(); // sync data access to map downloaded version
+		// Reads data from specific subresources at mapped downloading memory
+		void ReadFromMapped(byte* data, DX_ViewWrapper* view, bool flipRows = false);
 
-			D3D12_RANGE range{ srcOffset, size };
+		// copies de specific range of subresources from gpu resource to the downloading version
+		void UpdateMappedFromResource(DX_CommandList cmdList, DX_ViewWrapper* view);
 
-			byte* mappedData;
-			auto hr = downloading->Map(0, &range, (void**)&mappedData);
+		// Writes data in the first resource at specific region of the mapped data...
+		void WriteRegionToMappedSubresource(byte* data, DX_ViewWrapper* view, const D3D12_BOX &region, bool flipRows = false);
 
-			memcpy(dstData, mappedData + srcOffset, size);
+		// copies de specific region of the single-subresource from uploading to the gpu resource
+		void UpdateRegionFromUploading(DX_CommandList cmdList, DX_ViewWrapper* view, const D3D12_BOX &region);
 
-			D3D12_RANGE emptyRange{ 0, 0 };
-			downloading->Unmap(0, &emptyRange);
+		// Reads data from the first resource from specific region...
+		void ReadRegionFromMappedSubresource(byte* data, DX_ViewWrapper* view, const D3D12_BOX &region, bool flipRows = false);
 
-			mutex.Release();
-		}
-
-		//---Copied from d3d12x.h----------------------------------------------------------------------------
-		// Row-by-row memcpy
-		inline void MemcpySubresource(
-			_In_ const D3D12_MEMCPY_DEST* pDest,
-			_In_ const D3D12_SUBRESOURCE_DATA* pSrc,
-			SIZE_T RowSizeInBytes,
-			UINT NumRows,
-			UINT NumSlices,
-			bool flipRows = false
-		)
-		{
-			for (UINT z = 0; z < NumSlices; ++z)
-			{
-				BYTE* pDestSlice = reinterpret_cast<BYTE*>(pDest->pData) + pDest->SlicePitch * z;
-				const BYTE* pSrcSlice = reinterpret_cast<const BYTE*>(pSrc->pData) + pSrc->SlicePitch * z;
-				for (UINT y = 0; y < NumRows; ++y)
-				{
-					memcpy(pDestSlice + pDest->RowPitch * y,
-						pSrcSlice + pSrc->RowPitch * (flipRows ? NumRows - y - 1 : y),
-						RowSizeInBytes);
-				}
-			}
-		}
-
-		void UploadToAllSubresource(byte* data, long size, bool flipRows) {
-			__ResolveUploading();
-			int srcOffset = 0;
-			for (UINT i = 0; i < subresources; ++i)
-			{
-				D3D12_MEMCPY_DEST DestData = { (byte*)permanentUploadingMap + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
-				D3D12_SUBRESOURCE_DATA subData;
-				subData.pData = data + srcOffset;
-				subData.RowPitch = pRowSizesInBytes[i];
-				subData.SlicePitch = pRowSizesInBytes[i] * pNumRows[i];
-				MemcpySubresource(&DestData, &subData, static_cast<SIZE_T>(pRowSizesInBytes[i]), pNumRows[i], pLayouts[i].Footprint.Depth, flipRows);
-				srcOffset += pRowSizesInBytes[i] * pNumRows[i];
-			}
-		}
-
-		int SizeOfFormatElement(DXGI_FORMAT format) {
-			switch (format) {
-			case DXGI_FORMAT_R32G32B32A32_TYPELESS:
-			case DXGI_FORMAT_R32G32B32A32_FLOAT:
-			case DXGI_FORMAT_R32G32B32A32_UINT:
-			case DXGI_FORMAT_R32G32B32A32_SINT:
-				return 128;
-			case DXGI_FORMAT_R32G32B32_TYPELESS:
-			case DXGI_FORMAT_R32G32B32_FLOAT:
-			case DXGI_FORMAT_R32G32B32_UINT:
-			case DXGI_FORMAT_R32G32B32_SINT:
-				return 96;
-			case DXGI_FORMAT_R16G16B16A16_TYPELESS:
-			case DXGI_FORMAT_R16G16B16A16_FLOAT:
-			case DXGI_FORMAT_R16G16B16A16_UNORM:
-			case DXGI_FORMAT_R16G16B16A16_UINT:
-			case DXGI_FORMAT_R16G16B16A16_SNORM:
-			case DXGI_FORMAT_R16G16B16A16_SINT:
-			case DXGI_FORMAT_R32G32_TYPELESS:
-			case DXGI_FORMAT_R32G32_FLOAT:
-			case DXGI_FORMAT_R32G32_UINT:
-			case DXGI_FORMAT_R32G32_SINT:
-			case DXGI_FORMAT_R32G8X24_TYPELESS:
-			case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
-			case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
-			case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
-				return 64;
-			case DXGI_FORMAT_R10G10B10A2_TYPELESS:
-			case DXGI_FORMAT_R10G10B10A2_UNORM:
-			case DXGI_FORMAT_R10G10B10A2_UINT:
-			case DXGI_FORMAT_R11G11B10_FLOAT:
-			case DXGI_FORMAT_R8G8B8A8_TYPELESS:
-			case DXGI_FORMAT_R8G8B8A8_UNORM:
-			case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-			case DXGI_FORMAT_R8G8B8A8_UINT:
-			case DXGI_FORMAT_R8G8B8A8_SNORM:
-			case DXGI_FORMAT_R8G8B8A8_SINT:
-			case DXGI_FORMAT_R16G16_TYPELESS:
-			case DXGI_FORMAT_R16G16_FLOAT:
-			case DXGI_FORMAT_R16G16_UNORM:
-			case DXGI_FORMAT_R16G16_UINT:
-			case DXGI_FORMAT_R16G16_SNORM:
-			case DXGI_FORMAT_R16G16_SINT:
-			case DXGI_FORMAT_R32_TYPELESS:
-			case DXGI_FORMAT_D32_FLOAT:
-			case DXGI_FORMAT_R32_FLOAT:
-			case DXGI_FORMAT_R32_UINT:
-			case DXGI_FORMAT_R32_SINT:
-			case DXGI_FORMAT_R24G8_TYPELESS:
-			case DXGI_FORMAT_D24_UNORM_S8_UINT:
-			case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
-			case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
-			case DXGI_FORMAT_B8G8R8A8_UNORM:
-			case DXGI_FORMAT_B8G8R8X8_UNORM:
-				return 32;
-			case DXGI_FORMAT_R8G8_TYPELESS:
-			case DXGI_FORMAT_R8G8_UNORM:
-			case DXGI_FORMAT_R8G8_UINT:
-			case DXGI_FORMAT_R8G8_SNORM:
-			case DXGI_FORMAT_R8G8_SINT:
-			case DXGI_FORMAT_R16_TYPELESS:
-			case DXGI_FORMAT_R16_FLOAT:
-			case DXGI_FORMAT_D16_UNORM:
-			case DXGI_FORMAT_R16_UNORM:
-			case DXGI_FORMAT_R16_UINT:
-			case DXGI_FORMAT_R16_SNORM:
-			case DXGI_FORMAT_R16_SINT:
-			case DXGI_FORMAT_B5G6R5_UNORM:
-			case DXGI_FORMAT_B5G5R5A1_UNORM:
-				return 16;
-			case DXGI_FORMAT_R8_TYPELESS:
-			case DXGI_FORMAT_R8_UNORM:
-			case DXGI_FORMAT_R8_UINT:
-			case DXGI_FORMAT_R8_SNORM:
-			case DXGI_FORMAT_R8_SINT:
-			case DXGI_FORMAT_A8_UNORM:
-				return 8;
-			}
-		}
-
-		void UploadRegion(int subresource, byte* data, D3D12_BOX* box = nullptr) {
-			__ResolveUploading();
-
-			D3D12_BOX fullBox{ 0, 0, 0, pLayouts[subresource].Footprint.Width, pLayouts[subresource].Footprint.Height, desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize };
-
-			if (box == nullptr)
-				box = &fullBox;
-
-			UINT64 bytesPerElement = desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ? 1 : SizeOfFormatElement(this->desc.Format);
-			UINT64 srcRowPitch = (box->right - box->left) * bytesPerElement;
-			UINT64 srcSlicePitch = (box->bottom - box->top) * srcRowPitch;
-
-			UINT64 bytesPerRow = pLayouts[subresource].Footprint.RowPitch;
-			UINT64 bytesPerSlice = pLayouts[subresource].Footprint.Height * bytesPerRow;
-			for (int slice = box->front; slice < box->back; slice++)
-			{
-				byte* dstStartSlicePtr = ((byte*)permanentUploadingMap + pLayouts[subresource].Offset) + slice * bytesPerSlice;
-				const byte* srcStartSlicePtr = ((byte*)data) + slice * srcSlicePitch;
-				for (int row = box->top; row < box->bottom; row++)
-					memcpy(
-						dstStartSlicePtr + row * bytesPerRow + box->left * bytesPerElement,
-						srcStartSlicePtr + row * srcRowPitch, srcRowPitch);
-			}
-		}
-
-		void DownloadFromAllSubresources(byte* data, long size, bool flipRows) {
-			__ResolveDownloading();
-
-			D3D12_RANGE range{ 0, size };
-
-			byte* mappedData;
-
-			mutex.Acquire();
-			auto hr = downloading->Map(0, &range, (void**)&mappedData);
-
-			int srcOffset = 0;
-			for (UINT i = 0; i < 1; ++i)
-			{
-				D3D12_SUBRESOURCE_DATA DestData = {
-					(byte*)mappedData + pLayouts[i].Offset,
-					pLayouts[i].Footprint.RowPitch,
-					SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i])
-				};
-				D3D12_MEMCPY_DEST subData;
-				subData.pData = data + srcOffset;
-				subData.RowPitch = pRowSizesInBytes[i];
-				subData.SlicePitch = pRowSizesInBytes[i] * pNumRows[i];
-
-				MemcpySubresource(&subData, &DestData, static_cast<SIZE_T>(pRowSizesInBytes[i]), pNumRows[i], pLayouts[i].Footprint.Depth, flipRows);
-				srcOffset += pRowSizesInBytes[i] * pNumRows[i];
-			}
-			D3D12_RANGE emptyRange{ 0, 0 };
-			downloading->Unmap(0, &emptyRange);
-			mutex.Release();
-		}
-
-		// Copies the resource data from uploading version to GPU
-		void GrantGPUAccess(DX_CommandList cmd) {
-			if (resource != uploading)
-				cmd->CopyResource(resource, uploading);
-		}
-
-		// Copies the resource data to the downloading version from the GPU.
-		void GrantCPUAccess(DX_CommandList cmd) {
-			if (resource != downloading)
-				cmd->CopyResource(downloading, resource);
-		}
-
+		void UpdateRegionToDownloading(DX_CommandList cmdList, DX_ViewWrapper* view, const D3D12_BOX &region);
+		
+		// Creates a barrier in a cmd list to trasition usage states for this resource.
 		void AddBarrier(DX_CommandList cmdList, D3D12_RESOURCE_STATES dst) {
 			// If the resource is used as UAV
 			// Put a barrier to finish any pending read/write op
@@ -710,7 +633,7 @@ namespace CA4G {
 			}
 			else {
 				result->arrayStart = this->arrayStart;
-				result->arrayCount = arrayNewCount;
+				result->arrayCount = this->arrayCount;
 			}
 
 			return result;
