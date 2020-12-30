@@ -199,6 +199,9 @@ namespace CA4G {
 		DX_ResourceWrapper(DX_Wrapper* wrapper, DX_Resource resource, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState, CPUAccessibility cpuAccessibility)
 			: device(wrapper->device), dxWrapper(wrapper), resource(resource), desc(desc)
 		{
+			if (resource == nullptr) // null resource for nullview
+				return;
+
 			cpuaccess = cpuAccessibility;
 
 			LastUsageState = initialState; // state at creation
@@ -212,6 +215,9 @@ namespace CA4G {
 		}
 
 		~DX_ResourceWrapper() {
+			if (resource == nullptr)
+				return;
+
 			delete[] pLayouts;
 			delete[] pNumRows;
 			delete[] pRowSizesInBytes;
@@ -456,6 +462,8 @@ namespace CA4G {
 			switch (type) {
 			case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
 				return getSRVHandle();
+			case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
+				return getCBVHandle();
 			}
 			return D3D12_CPU_DESCRIPTOR_HANDLE();
 		}
@@ -535,6 +543,11 @@ namespace CA4G {
 			d.Format = !resource->resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
 		}
 
+		void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC& d) {
+			d.BufferLocation = !resource ? 0 : resource->resource->GetGPUVirtualAddress();
+			d.SizeInBytes = (this->elementStride * this->arrayCount + 255) & ~255;
+		}
+
 		int getSRV() {
 			if ((handle_mask & 1) != 0)
 				return srv_cached_handle;
@@ -551,6 +564,24 @@ namespace CA4G {
 			}
 			mutex.Release();
 			return srv_cached_handle;
+		}
+
+		int getCBV() {
+			if ((handle_mask & 4) != 0)
+				return cbv_cached_handle;
+
+			mutex.Acquire();
+			if ((handle_mask & 4) == 0)
+			{
+				D3D12_CONSTANT_BUFFER_VIEW_DESC d;
+				ZeroMemory(&d, sizeof(D3D12_CONSTANT_BUFFER_VIEW_DESC));
+				CreateCBVDesc(d);
+				cbv_cached_handle = resource->dxWrapper->cpu_csu->AllocateNewHandle();
+				resource->dxWrapper->device->CreateConstantBufferView(&d, resource->dxWrapper->cpu_csu->getCPUVersion(cbv_cached_handle));
+				handle_mask |= 4;
+			}
+			mutex.Release();
+			return cbv_cached_handle;
 		}
 
 		int getRTV() {
@@ -602,6 +633,10 @@ namespace CA4G {
 
 		D3D12_CPU_DESCRIPTOR_HANDLE getSRVHandle() {
 			return resource->dxWrapper->cpu_csu->getCPUVersion(getSRV());
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getCBVHandle() {
+			return resource->dxWrapper->cpu_csu->getCPUVersion(getCBV());
 		}
 
 #pragma endregion

@@ -111,7 +111,7 @@ namespace CA4G {
 	/// Given a direction, creates two othonormal vectors to it.
 	/// From the paper: Building an Orthonormal Basis, Revisited, Tom Duff, et.al.
 	/// </summary>
-	void createOrthoBasis(const float3 &N, float3 &T, float3 &B)
+	static void createOrthoBasis(const float3 &N, float3 &T, float3 &B)
 	{
 		float sign = copysign(1.0f, N.z);
 		float a = -1.0f / (sign + N.z);
@@ -124,14 +124,14 @@ namespace CA4G {
 	
 	#pragma region inverse
 
-	float1x1 inverse(const float1x1& m) {
+	static float1x1 inverse(const float1x1& m) {
 		if (m._m00 == 0.0f)
 			return 0.0f;
 
 		return float1x1(1.0 / m._m00);
 	}
 
-	float2x2 inverse(const float2x2& m) {
+	static float2x2 inverse(const float2x2& m) {
 		float det = m._m00 * m._m11 - m._m10 * m._m01;
 		if (det == 0)
 			return 0.0f;
@@ -139,7 +139,7 @@ namespace CA4G {
 		return float2x2(m._m11, m._m01, m._m10, m._m00) / det;
 	}
 
-	float3x3 inverse(const float3x3 &m)
+	static float3x3 inverse(const float3x3& m)
 	{
 		/// 00 01 02
 		/// 10 11 12
@@ -147,7 +147,7 @@ namespace CA4G {
 		float Min00 = m._m11 * m._m22 - m._m12 * m._m21;
 		float Min01 = m._m10 * m._m22 - m._m12 * m._m20;
 		float Min02 = m._m10 * m._m21 - m._m11 * m._m20;
-							  
+
 		float det = Min00 * m._m00 - Min01 * m._m01 + Min02 * m._m02;
 
 		if (det == 0)
@@ -167,7 +167,7 @@ namespace CA4G {
 			(+Min02 / det), (-Min12 / det), (+Min22 / det));
 	}
 
-	float4x4 inverse(const float4x4 &m) {
+	static float4x4 inverse(const float4x4& m) {
 		float Min00 = m._m11 * m._m22 * m._m33 + m._m12 * m._m23 * m._m31 + m._m13 * m._m21 * m._m32 - m._m11 * m._m23 * m._m32 - m._m12 * m._m21 * m._m33 - m._m13 * m._m22 * m._m31;
 		float Min01 = m._m10 * m._m22 * m._m33 + m._m12 * m._m23 * m._m30 + m._m13 * m._m20 * m._m32 - m._m10 * m._m23 * m._m32 - m._m12 * m._m20 * m._m33 - m._m13 * m._m22 * m._m30;
 		float Min02 = m._m10 * m._m21 * m._m33 + m._m11 * m._m23 * m._m30 + m._m13 * m._m20 * m._m31 - m._m10 * m._m23 * m._m31 - m._m11 * m._m20 * m._m33 - m._m13 * m._m21 * m._m30;
@@ -469,8 +469,6 @@ namespace CA4G {
 				0, 0, znearPlane / (znearPlane - zfarPlane), 1);
 		}
 	};
-
-
 
 }
 

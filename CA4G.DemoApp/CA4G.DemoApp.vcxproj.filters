@@ -54,6 +54,12 @@
     <ClInclude Include="main_technique.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Shaders\GUITraits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="main_scene.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CA4G.DemoApp.cpp">
@@ -95,7 +101,9 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\Demo_VS.hlsl" />
-    <FxCompile Include="Shaders\Demo_PS.hlsl" />
+    <FxCompile Include="Shaders\Samples\Demo_PS.hlsl" />
+    <FxCompile Include="Shaders\Samples\Demo_VS.hlsl" />
+    <FxCompile Include="Shaders\Samples\Basic_VS.hlsl" />
+    <FxCompile Include="Shaders\Samples\Basic_PS.hlsl" />
   </ItemGroup>
 </Project>

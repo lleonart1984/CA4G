@@ -33,9 +33,15 @@ namespace CA4G {
 		D3D12_RESOURCE_DESC nullDesc = {
 		};
 		nullDesc.Dimension = dimension;
+		nullDesc.Format = DXGI_FORMAT_R8_SINT;
+		nullDesc.Width = 1;
+		nullDesc.Height = 1;
+		nullDesc.DepthOrArraySize = 1;
+		nullDesc.MipLevels = 1;
+		nullDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 		DX_ResourceWrapper* nullresource = new DX_ResourceWrapper(deviceManager, nullptr, nullDesc, D3D12_RESOURCE_STATE_GENERIC_READ, CPUAccessibility::None);
 		DX_ViewWrapper* nullview = new DX_ViewWrapper(nullresource);
-		nullview->arrayCount = 1;
+		nullview->arrayCount = 0;
 		nullview->mipCount = 1;
 		nullview->elementStride = 1;
 		nullview->ViewDimension = dimension;

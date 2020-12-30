@@ -2,6 +2,7 @@
 #define CA4G_H
 
 #include "ca4g_pipelines.h"
+#include "ca4g_scene.h"
 
 #pragma region DSL commands
 

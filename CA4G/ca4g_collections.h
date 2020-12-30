@@ -14,13 +14,15 @@ namespace CA4G {
 			capacity = 32;
 			count = 0;
 			elements = new T[capacity];
+			ZeroMemory(elements, sizeof(T) * capacity);
 		}
 		list(const list<T>& other) {
 			this->count = other.count;
 			this->elements = new T[other.capacity];
-			for (int i = 0; i < this->count; i++)
-				this->elements[i] = other.elements[i];
 			this->capacity = other.capacity;
+			ZeroMemory(elements, sizeof(T) * capacity);
+			for (int i = 0; i < this->capacity; i++)
+				this->elements[i] = other.elements[i];
 		}
 	public:
 
@@ -39,6 +41,8 @@ namespace CA4G {
 			capacity = max(32, initialElements.size());
 			count = initialElements.size();
 			elements = new T[capacity];
+			ZeroMemory(elements, sizeof(T) * capacity);
+
 			for (int i = 0; i < initialElements.size(); i++)
 				elements[i] = initialElements[i];
 		}
@@ -47,17 +51,20 @@ namespace CA4G {
 			delete[] elements;
 		}
 
-		void add(T item) {
+		int add(T item) {
 			if (count == capacity)
 			{
 				capacity = (int)(capacity * 1.3);
 				T* newelements = new T[capacity];
+				ZeroMemory(newelements, sizeof(T) * capacity);
+
 				for (int i = 0; i < count; i++)
 					newelements[i] = elements[i];
 				delete[] elements;
 				elements = newelements;
 			}
-			elements[count++] = item;
+			elements[count] = item;
+			return count++;
 		}
 
 		inline T& operator[](int index) const {

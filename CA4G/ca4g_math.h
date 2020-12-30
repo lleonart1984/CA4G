@@ -3,6 +3,11 @@
 
 #include <cmath>
 
+
+#define MAX_FLOAT ((std::numeric_limits<float>().max)())
+#define MIN_FLOAT ((std::numeric_limits<float>().min)())
+
+
 #define uint unsigned int
 namespace CA4G {
 
@@ -1064,6 +1069,7 @@ namespace CA4G {
 			if (idx == 0) return this->x;
 			return __TRASH; // Silent return ... valid for HLSL
 		}
+		float1() = default;
 		float1(float x) {
 			this->x = x;
 		}
@@ -1096,6 +1102,7 @@ namespace CA4G {
 			if (idx == 1) return this->y;
 			return __TRASH; // Silent return ... valid for HLSL
 		}
+		float2() = default;
 		float2(float x, float y) {
 			this->x = x;
 			this->y = y;
@@ -1134,6 +1141,7 @@ namespace CA4G {
 			if (idx == 2) return this->z;
 			return __TRASH; // Silent return ... valid for HLSL
 		}
+		float3() = default;
 		float3(float x, float y, float z) {
 			this->x = x;
 			this->y = y;
@@ -1177,6 +1185,7 @@ namespace CA4G {
 			if (idx == 3) return this->w;
 			return __TRASH; // Silent return ... valid for HLSL
 		}
+		float4() = default;
 		float4(float x, float y, float z, float w) {
 			this->x = x;
 			this->y = y;
@@ -1826,6 +1835,7 @@ namespace CA4G {
 			if (row == 3) return float3(_m30, _m31, _m32);
 			return 0; // Silent return ... valid for HLSL
 		}
+		float4x3() = default;
 		float4x3(float _m00, float _m01, float _m02, float _m10, float _m11, float _m12, float _m20, float _m21, float _m22, float _m30, float _m31, float _m32) {
 			this->_m00 = _m00;
 			this->_m01 = _m01;
@@ -1895,6 +1905,7 @@ namespace CA4G {
 			if (row == 3) return float4(_m30, _m31, _m32, _m33);
 			return 0; // Silent return ... valid for HLSL
 		}
+		float4x4() = default;
 		float4x4(float _m00, float _m01, float _m02, float _m03, float _m10, float _m11, float _m12, float _m13, float _m20, float _m21, float _m22, float _m23, float _m30, float _m31, float _m32, float _m33) {
 			this->_m00 = _m00;
 			this->_m01 = _m01;
@@ -3536,6 +3547,13 @@ namespace CA4G {
 	static float1x2 mul(const float1x4& a, const float4x2& b) { return float1x2(a._m00 * b._m00 + a._m01 * b._m10 + a._m02 * b._m20 + a._m03 * b._m30, a._m00 * b._m01 + a._m01 * b._m11 + a._m02 * b._m21 + a._m03 * b._m31); }
 	static float1x3 mul(const float1x4& a, const float4x3& b) { return float1x3(a._m00 * b._m00 + a._m01 * b._m10 + a._m02 * b._m20 + a._m03 * b._m30, a._m00 * b._m01 + a._m01 * b._m11 + a._m02 * b._m21 + a._m03 * b._m31, a._m00 * b._m02 + a._m01 * b._m12 + a._m02 * b._m22 + a._m03 * b._m32); }
 	static float1x4 mul(const float1x4& a, const float4x4& b) { return float1x4(a._m00 * b._m00 + a._m01 * b._m10 + a._m02 * b._m20 + a._m03 * b._m30, a._m00 * b._m01 + a._m01 * b._m11 + a._m02 * b._m21 + a._m03 * b._m31, a._m00 * b._m02 + a._m01 * b._m12 + a._m02 * b._m22 + a._m03 * b._m32, a._m00 * b._m03 + a._m01 * b._m13 + a._m02 * b._m23 + a._m03 * b._m33); }
+	static float4 mul(const float4& a, const float4x4& b) {
+		return float4(
+			a.x * b._m00 + a.y * b._m10 + a.z * b._m20 + a.w * b._m30,
+			a.x * b._m01 + a.y * b._m11 + a.z * b._m21 + a.w * b._m31,
+			a.x * b._m02 + a.y * b._m12 + a.z * b._m22 + a.w * b._m32,
+			a.x * b._m03 + a.y * b._m13 + a.z * b._m23 + a.w * b._m33);
+	}
 	static float2x1 mul(const float2x1& a, const float1x1& b) { return float2x1(a._m00 * b._m00, a._m10 * b._m00); }
 	static float2x2 mul(const float2x1& a, const float1x2& b) { return float2x2(a._m00 * b._m00, a._m00 * b._m01, a._m10 * b._m00, a._m10 * b._m01); }
 	static float2x3 mul(const float2x1& a, const float1x3& b) { return float2x3(a._m00 * b._m00, a._m00 * b._m01, a._m00 * b._m02, a._m10 * b._m00, a._m10 * b._m01, a._m10 * b._m02); }

@@ -1,6 +1,7 @@
 #include <Windows.h>
 
 #include "main_technique.h"
+#include "main_scene.h"
 
 using namespace CA4G;
 
@@ -28,6 +29,11 @@ int main(int, char**)
 	::UpdateWindow(hwnd);
 
 	auto technique = presenter _create TechniqueObj<main_technique>();
+	gObj<SceneManager> scene = new main_scene();
+	scene->SetupScene();
+
+	if (technique.Dynamic_Cast<IManageScene>())
+		technique.Dynamic_Cast<IManageScene>()->SetSceneManager(scene);
 
 	presenter _load TechniqueObj(technique);
 
@@ -44,6 +50,8 @@ int main(int, char**)
 			::DispatchMessage(&msg);
 			continue;
 		}
+
+		scene->Animate(0, 0);
 
 		presenter _dispatch TechniqueObj(technique); // excutes the technique 
 		

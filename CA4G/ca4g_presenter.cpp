@@ -459,6 +459,13 @@ namespace CA4G {
 		cmdList->ClearRenderTargetView(view->getRTVHandle(), values, 0, nullptr);
 	}
 
+	void CA4G::GraphicsManager::Clearing::DepthStencil(gObj<Texture2D> depthStencil, float depth, UINT8 stencil, D3D12_CLEAR_FLAGS flags)
+	{
+		auto cmdList = ((DX_CmdWrapper*)this->wrapper->__InternalDXCmdWrapper)->cmdList;
+		DX_ViewWrapper* view = (DX_ViewWrapper*)depthStencil->__InternalViewWrapper;
+		cmdList->ClearDepthStencilView(view->getDSVHandle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, 0, nullptr);
+	}
+
 #pragma endregion
 
 #pragma region Copy Manager

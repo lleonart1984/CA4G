@@ -318,6 +318,10 @@ namespace CA4G {
 
 		public:
 			void FromPtr(byte* data, bool flipRows = false);
+			template<typename T>
+			void FromPtr(T* data) {
+				FromPtr((byte*)data);
+			}
 			void ToPtr(byte* data, bool flipRows = false);
 			void RegionFromPtr(byte* data, const D3D12_BOX &region, bool flipRows = false);
 			void RegionToPtr(byte* data, const D3D12_BOX& region, bool flipRows = false);
@@ -327,7 +331,7 @@ namespace CA4G {
 			}
 			template<typename T>
 			void FromValue(const T& elementValue) {
-				FromPtr(&elementValue);
+				FromPtr((byte*)&elementValue);
 			}
 		} * const copy;
 	};

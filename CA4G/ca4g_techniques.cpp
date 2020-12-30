@@ -7,7 +7,7 @@ namespace CA4G {
 
 	gObj<ResourceView> Creating::CustomDXResource(
 		int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
-		D3D12_CLEAR_VALUE* clearing, CPUAccessibility cpuAccessibility)
+		D3D12_CLEAR_VALUE* clearing, CPUAccessibility cpuAccessibility, bool isConstantBuffer)
 	{
 		if (elementWidth == 0)
 			elementWidth = DX_ResourceWrapper::SizeOfFormatElement(desc.Format);
@@ -55,7 +55,7 @@ namespace CA4G {
 		rwrapper->elementStride = rwrapper->desc.Format == DXGI_FORMAT_UNKNOWN ? elementWidth : rwrapper->SizeOfFormatElement(rwrapper->desc.Format);
 		switch (desc.Dimension) {
 		case D3D12_RESOURCE_DIMENSION_BUFFER:
-			return new Buffer(rwrapper, nullptr, elementWidth, desc.Width / elementWidth);
+			return new Buffer(rwrapper, nullptr, elementWidth, isConstantBuffer ? 1 : desc.Width / elementWidth);
 		case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
 			return new Texture1D(rwrapper, nullptr, desc.Format, desc.Width, desc.MipLevels, desc.DepthOrArraySize);
 		case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
@@ -82,34 +82,40 @@ namespace CA4G {
 	gObj<Buffer> Creating::Buffer_CB(int elementStride, bool dynamic) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, (elementStride + 255) & (~255));
-		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, dynamic ? CPUAccessibility::Write : CPUAccessibility::None).Dynamic_Cast<Buffer>();
+		return CustomDXResource(elementStride, desc, dynamic ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COPY_DEST, nullptr, dynamic ? CPUAccessibility::Write : CPUAccessibility::None, true).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_ADS(int elementStride, int count) {
+		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_SRV(int elementStride, int count) {
+		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count);
 		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_VB(int elementStride, int count) {
+		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count);
 		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
 	}
 
-	gObj<Buffer> Creating::Buffer_IB(int elementStride, int count) {
+	gObj<Buffer> Creating::Buffer_IB(int elementStride, int count)
+	{
+		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count);
 		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_UAV(int elementStride, int count) {
+		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr).Dynamic_Cast<Buffer>();

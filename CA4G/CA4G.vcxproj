@@ -67,7 +67,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(SolutionDir)Libraries\DirectXTex;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(SolutionDir)Libraries\DirectXTex;$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -171,6 +176,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="ca4g_resources.h" />
+    <ClInclude Include="ca4g_scene.h" />
     <ClInclude Include="ca4g_techniques.h" />
     <ClInclude Include="private_ca4g_definitions.h" />
     <ClInclude Include="private_ca4g_descriptors.h" />
@@ -185,6 +191,7 @@
     <ClCompile Include="ca4g_pipelines.cpp" />
     <ClCompile Include="ca4g_presenter.cpp" />
     <ClCompile Include="ca4g_resources.cpp" />
+    <ClCompile Include="ca4g_scene.cpp" />
     <ClCompile Include="ca4g_techniques.cpp" />
     <ClCompile Include="private_ca4g_descriptors.cpp" />
   </ItemGroup>

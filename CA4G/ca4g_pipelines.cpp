@@ -250,7 +250,7 @@ namespace CA4G {
 
 		SlotBinding b{  };
 		b.Root_Parameter = p;
-		b.ConstantData.ptrToConstant = (void*)&data;
+		b.ConstantData.ptrToConstant = data;
 		((InternalBindings*)binder->__InternalBindingObject)->__CSU.add(b);
 	}
 	
@@ -332,6 +332,11 @@ namespace CA4G {
 	{
 		((InternalBindings*)binder->__InternalBindingObject)->RenderTargets[slot] = &resource;
 		((InternalBindings*)binder->__InternalBindingObject)->RenderTargetMax = max(((InternalBindings*)binder->__InternalBindingObject)->RenderTargetMax, slot + 1);
+	}
+
+	void CA4G::GraphicsBinder::Setting::SetDSV(gObj<Texture2D>& const resource)
+	{
+		((InternalBindings*)binder->__InternalBindingObject)->DepthBufferField = &resource;
 	}
 
 #pragma endregion

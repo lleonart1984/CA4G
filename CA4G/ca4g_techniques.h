@@ -137,7 +137,7 @@ namespace CA4G {
 
 		// Tool method generic to create DX12 resources
 		gObj<ResourceView> CustomDXResource(int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
-			D3D12_CLEAR_VALUE* clearing = nullptr, CPUAccessibility cpuAccessibility = CPUAccessibility::None);
+			D3D12_CLEAR_VALUE* clearing = nullptr, CPUAccessibility cpuAccessibility = CPUAccessibility::None, bool isConstantBuffer = false);
 
 		// Creates a technique of specific type and passing some arguments to the constructor.
 		template<typename T, typename... A>
@@ -153,7 +153,7 @@ namespace CA4G {
 		gObj<Buffer> Buffer_CB(int elementStride, bool dynamic);
 		template <typename T>
 		gObj<Buffer> Buffer_CB(bool dynamic = false) {
-			return Buffer_CB(sizeof(T));
+			return Buffer_CB(sizeof(T), dynamic);
 		}
 
 		// Creates a buffer to store modifiable acceleration datastructure geometry and instance buffers.

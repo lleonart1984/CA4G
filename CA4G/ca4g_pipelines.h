@@ -8248,26 +8248,69 @@ namespace CA4G {
 		/*Float*/{ DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,DXGI_FORMAT_R32G32B32A32_FLOAT },
 	};
 
+	enum class VertexElementSemantic
+	{
+		Custom,
+		Position,
+		Normal,
+		TexCoord,
+		Tangent,
+		Binormal,
+		Color
+	};
+
+	constexpr static LPCSTR GetSemanticText(VertexElementSemantic s) {
+		switch (s) {
+		case VertexElementSemantic::Position:
+			return "POSITION";
+		case VertexElementSemantic::Normal:
+			return "NORMAL";
+		case VertexElementSemantic::TexCoord:
+			return "TEXCOORD";
+		case VertexElementSemantic::Tangent:
+			return "TANGENT";
+		case VertexElementSemantic::Binormal:
+			return "BINORMAL";
+		case VertexElementSemantic::Color:
+			return "COLOR";
+		}
+		throw CA4G::CA4GException("Standard semantic can not be custom.");
+	}
+
 	// Basic struct for constructing vertex element descriptions
 	struct VertexElement {
 		// Type for each field component
 		const VertexElementType Type;
 		// Number of components
 		const int Components;
+
+		VertexElementSemantic const Semantic;
 		// String with the semantic
-		LPCSTR const Semantic;
+		LPCSTR const SemanticText;
 		// Index for indexed semantics
 		const int SemanticIndex;
 		// Buffer slot this field will be contained.
 		const int Slot;
 	public:
+
 		constexpr VertexElement(
 			VertexElementType Type,
 			int Components,
-			LPCSTR const Semantic,
+			VertexElementSemantic standardSemantic,
 			int SemanticIndex = 0,
 			int Slot = 0
-		) :Type(Type), Components(Components), Semantic(Semantic), SemanticIndex(SemanticIndex), Slot(Slot)
+		) :Type(Type), Components(Components), SemanticText(GetSemanticText(standardSemantic)), SemanticIndex(SemanticIndex), Slot(Slot),
+			Semantic(standardSemantic)
+		{
+		}
+		constexpr VertexElement(
+			VertexElementType Type,
+			int Components,
+			LPCSTR const customSemantic,
+			int SemanticIndex = 0,
+			int Slot = 0
+		) :Type(Type), Components(Components), SemanticText(customSemantic), SemanticIndex(SemanticIndex), Slot(Slot),
+			Semantic(VertexElementSemantic::Custom)
 		{
 		}
 		// Creates a Dx12 description using this information.
@@ -8278,7 +8321,7 @@ namespace CA4G {
 			d.InputSlot = Slot;
 			d.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 			d.SemanticIndex = SemanticIndex;
-			d.SemanticName = Semantic;
+			d.SemanticName = SemanticText;
 			size += 4 * Components;
 			return d;
 		}
