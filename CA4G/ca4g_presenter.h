@@ -10,6 +10,7 @@
 #ifndef CA4G_NUMBER_OF_WORKERS
 #define CA4G_NUMBER_OF_WORKERS 8
 #endif // !CA4G_NUMBER_OF_WORKERS
+#include <atlcomcli.h>
 
 
 namespace CA4G {
@@ -382,11 +383,21 @@ namespace CA4G {
 		void BackBuffer();
 	};
 
-	class Presenter : public IDXDeviceManager {
+	struct InternalDXInfo {
+		HWND hWnd;
+		CComPtr<ID3D12Device5> device = nullptr;
+		CComPtr<IDXGISwapChain3> swapChain = nullptr;
+		CComPtr<ID3D12GraphicsCommandList4> mainCmdList = nullptr;
+		int Buffers;
+		DXGI_FORMAT RenderTargetFormat;
+		D3D12_CPU_DESCRIPTOR_HANDLE* RenderTargets;
+	};
 
+	class Presenter : public IDXDeviceManager {
+		gObj<InternalDXInfo> internalInfo = nullptr;
 	public:
 		// Creates a presenter object that creates de DX device attached to a specific window (hWnd).
-		Presenter(HWND hWnd);
+		Presenter(HWND hWnd, gObj<InternalDXInfo> &internalInfo);
 		~Presenter();
 
 		Creating * const create;

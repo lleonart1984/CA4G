@@ -1,10 +1,15 @@
 #include <Windows.h>
 
+#include "ImGui/imgui.h"
+#include "ImGui/imgui_impl_win32.h"
+#include "ImGui/imgui_impl_dx12.h"
+
 #include "main_technique.h"
 #include "main_scene.h"
 
 using namespace CA4G;
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 // Main code
@@ -16,8 +21,10 @@ int main(int, char**)
 	::RegisterClassEx(&wc);
 	HWND hwnd = ::CreateWindow(wc.lpszClassName, TEXT("DirectX12 Example with CA4G"), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, NULL);
 
+	gObj<InternalDXInfo> dxObjects;
+
 	// Create the presenter object
-	gObj<Presenter> presenter = new Presenter(hwnd);
+	gObj<Presenter> presenter = new Presenter(hwnd, dxObjects);
 
 	presenter _set WindowResolution(); // Defines the render target to fit the window resolution
 	presenter _set UseFrameBuffering(); // Use frame buffering, that means that next frame will be commiting while previous frame is presented.
@@ -27,6 +34,39 @@ int main(int, char**)
 	// Show the window
 	::ShowWindow(hwnd, SW_SHOWDEFAULT);
 	::UpdateWindow(hwnd);
+
+	#pragma region ImGui Initialization
+
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsClassic();
+
+	CComPtr<ID3D12DescriptorHeap> guiDescriptors;
+	// Create GUI SRV Descriptor Heap
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		desc.NumDescriptors = 1;
+		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		if (dxObjects->device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&guiDescriptors)) != S_OK)
+			return false;
+	}
+
+	// Setup Platform/Renderer backends
+	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplDX12_Init(dxObjects->device, dxObjects->Buffers,
+		dxObjects->RenderTargetFormat, guiDescriptors,
+		guiDescriptors->GetCPUDescriptorHandleForHeapStart(),
+		guiDescriptors->GetGPUDescriptorHandleForHeapStart());
+
+	#pragma endregion
 
 	auto technique = presenter _create TechniqueObj<main_technique>();
 	gObj<SceneManager> scene = new main_scene();
@@ -51,10 +91,41 @@ int main(int, char**)
 			continue;
 		}
 
-		scene->Animate(0, 0);
+		#pragma region New Frame GUI
+
+		// Start the Dear ImGui frame
+		ImGui_ImplDX12_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+
+		#pragma endregion
+
+		#pragma region GUI Population
+		
+		if (true)
+		{
+			ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			ImGui::End();
+		}
+
+		#pragma endregion
+
+		scene->Animate(ImGui::GetTime(), ImGui::GetFrameCount());
 
 		presenter _dispatch TechniqueObj(technique); // excutes the technique 
 		
+		#pragma region Present GUI
+		auto renderTargetHandle = dxObjects->RenderTargets[dxObjects->swapChain->GetCurrentBackBufferIndex()];
+		dxObjects->mainCmdList->OMSetRenderTargets(1, &renderTargetHandle, false, nullptr);
+		ID3D12DescriptorHeap* dh[1] = { guiDescriptors };
+		dxObjects->mainCmdList->SetDescriptorHeaps(1, dh);
+
+		ImGui::Render();
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxObjects->mainCmdList);
+
+		#pragma endregion
+
 		presenter _dispatch BackBuffer(); // present the current back buffer.
 	}
 
@@ -64,6 +135,9 @@ int main(int, char**)
 // Win32 message handler
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
+		return true;
+
 	switch (msg)
 	{
 	case WM_SYSCOMMAND:

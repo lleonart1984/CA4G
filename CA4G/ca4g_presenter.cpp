@@ -1,13 +1,17 @@
 #include "private_ca4g_presenter.h"
 
 namespace CA4G {
-	Presenter::Presenter(HWND hWnd):
+	Presenter::Presenter(HWND hWnd, gObj<InternalDXInfo>& internalInfo) :
 		create(new Creating(this)),
 		load(new Loading(this)),
-		dispatch(new Dispatcher(this)), 
+		dispatch(new Dispatcher(this)),
 		set(new Settings(this)) {
 		__InternalDXWrapper = new DX_Wrapper();
 		__InternalState->hWnd = hWnd;
+
+		this->internalInfo = new InternalDXInfo();
+
+		internalInfo = this->internalInfo;
 	}
 
 	Presenter::~Presenter() {
@@ -104,6 +108,16 @@ namespace CA4G {
 
 	void Presenter::Settings::SwapChain() {
 		__PInternalState->Initialize();
+
+		this->presenter->internalInfo->hWnd = __PInternalState->hWnd;
+		this->presenter->internalInfo->device = __PInternalState->device;
+		this->presenter->internalInfo->swapChain = __PInternalState->swapChain;
+		this->presenter->internalInfo->Buffers = __PInternalState->swapChainDesc.BufferCount;
+		this->presenter->internalInfo->RenderTargetFormat = __PInternalState->swapChainDesc.Format;
+		this->presenter->internalInfo->RenderTargets = new D3D12_CPU_DESCRIPTOR_HANDLE[__PInternalState->swapChainDesc.BufferCount];
+		for (int i = 0; i < __PInternalState->swapChainDesc.BufferCount; i++)
+			this->presenter->internalInfo->RenderTargets[i] = __PInternalState->RenderTargetsRTV[i];
+		this->presenter->internalInfo->mainCmdList = __PInternalState->scheduler->Engines[0].threadInfos[0].cmdList;
 	}
 
 	// uses the presenter to swap buffers and present.
@@ -646,9 +660,22 @@ namespace CA4G {
 		// This sample does not support fullscreen transitions.
 		factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
+		// Initialize descriptor heaps
+
+		gui_csu = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 100, 100, 1);
+
+		gpu_csu = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 900000, 1000, swapChainDesc.BufferCount);
+		gpu_smp = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000, 100, swapChainDesc.BufferCount);
+
+		cpu_rt = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1000);
+		cpu_ds = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1000);
+		cpu_csu = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1000000);
+		cpu_smp = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000);
+
 		// Create rendertargets resources.
 		{
 			RenderTargets = new gObj<Texture2D>[swapChainDesc.BufferCount];
+			RenderTargetsRTV = new D3D12_CPU_DESCRIPTOR_HANDLE[swapChainDesc.BufferCount];
 			// Create a RTV and a command allocator for each frame.
 			for (UINT n = 0; n < swapChainDesc.BufferCount; n++)
 			{
@@ -660,25 +687,9 @@ namespace CA4G {
 				DX_ResourceWrapper* rw = new DX_ResourceWrapper(this, rtResource, desc, D3D12_RESOURCE_STATE_COPY_DEST, CPUAccessibility::None);
 
 				RenderTargets[n] = new Texture2D(rw, nullptr, desc.Format, desc.Width, desc.Height, 1, 1);
+				RenderTargetsRTV[n] = RenderTargets[n]->__InternalViewWrapper->getRTVHandle();
 			}
 		}
-
-		// Initialize descriptor heaps
-
-		gui_csu = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 100, 100, 1);
-
-		gpu_csu = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 900000, 1000, swapChainDesc.BufferCount);
-		gpu_smp = new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000, 100, swapChainDesc.BufferCount);
-		
-		cpu_rt = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1000);
-		cpu_ds = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1000);
-		cpu_csu = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1000000);
-		cpu_smp = new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000);
-
-		//CurrentBuffer = swapChain->GetCurrentBackBufferIndex();
-		//manager->BackBuffer = renderTargetViews[CurrentBuffer];
-
-		//renderTargetDescriptorSlot = manager->descriptors->gui_csu->MallocPersistent();
 	}
 
 	Signal GPUScheduler::FlushAndSignal(EngineMask mask) {

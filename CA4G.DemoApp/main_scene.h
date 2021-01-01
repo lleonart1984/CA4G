@@ -20,6 +20,8 @@ public:
 	}
 	~BunnyScene() {}
 
+	float4x4* InitialTransforms;
+
 	void SetupScene() {
 
 		camera.Position = float3(0, 0, 4);
@@ -38,6 +40,16 @@ public:
 
 		scene->appendScene(bunnyScene);
 
+		InitialTransforms = new float4x4[scene->Instances().Count];
+		for (int i = 0; i < scene->Instances().Count; i++)
+			InitialTransforms[i] = scene->Instances().Data[i].Transform;
+
 		SceneManager::SetupScene();
+	}
+
+	virtual void Animate(float time, int frame, SceneElement freeze = SceneElement::None) override {
+		scene->Instances().Data[0].Transform =
+			mul(Transforms::RotateY(time), InitialTransforms[0]);
+		OnUpdated(SceneElement::InstanceTransforms);
 	}
 };

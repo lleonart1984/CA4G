@@ -30,6 +30,7 @@ namespace CA4G {
 		CComPtr<IDXGISwapChain3> swapChain;
 
 		gObj<Texture2D>* RenderTargets;
+		D3D12_CPU_DESCRIPTOR_HANDLE* RenderTargetsRTV;
 
 		GPUScheduler* scheduler;
 
