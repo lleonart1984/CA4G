@@ -1,7 +1,5 @@
 #include "ca4g_scene.h"
 
-using namespace std;
-
 namespace CA4G {
 	
 #pragma region Tokenizer
@@ -210,6 +208,7 @@ namespace CA4G {
 	struct OBJLoaderState {
 		list<string> materialNames = { };
 		list<string> textureNames = {};
+		list<string> usedMaterials = { };
 
 		gObj<SceneBuilder> scene = new SceneBuilder();
 
@@ -219,7 +218,7 @@ namespace CA4G {
 					return i;
 
 			string full = subdir;
-			full += fileName;
+			full = full + fileName;
 
 			textureNames.add(fileName);
 			scene->appendTexture(full);
@@ -242,7 +241,7 @@ namespace CA4G {
 
 		void importMTLFile(string subdir, string fileName) {
 			string file = subdir;
-			file += fileName;
+			file = file + fileName;
 
 			string currentMaterialName = "";
 			SceneMaterial currentMaterial = {};
@@ -613,8 +612,8 @@ namespace CA4G {
 
 			string full(filePath);
 
-			string subDir = full.substr(0, full.find_last_of('\\') + 1);
-			string name = full.substr(full.find_last_of('\\') + 1);
+			string subDir = full.substr(0, full.find_last_of("\\") + 1);
+			string name = full.substr(full.find_last_of("\\") + 1);
 
 			FILE* stream;
 
@@ -626,7 +625,6 @@ namespace CA4G {
 
 			list<int> groupLimits;
 			list<int> materialLimits;
-			list<string> usedMaterials;
 
 			Tokenizer t(stream);
 			static int facecount = 0;

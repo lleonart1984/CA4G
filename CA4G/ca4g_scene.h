@@ -132,7 +132,7 @@ namespace CA4G {
 		list<int> indices = {};
 		list<SceneMaterial> materials = {};
 		list<float4x3> transforms = {};
-		list<std::string> textures = {};
+		list<string> textures = {};
 
 		list<GeometryDescription> geometries = {};
 		list<InstanceDescription> instances = {};

@@ -158,6 +158,8 @@ public:
 	gObj<Buffer> Lighting;
 	gObj<Buffer> GeometryTransforms;
 	gObj<Buffer> InstanceTransforms;
+	gObj<Texture2D>* Textures;
+	int TextureCount;
 
 	struct CameraCB {
 		float4x4 Projection;
@@ -176,6 +178,7 @@ public:
 		gObj<Buffer> InstanceTransforms;
 		gObj<Buffer> GeometryTransforms;
 		gObj<Buffer> Camera;
+		gObj<Texture2D> Texture;
 		
 		struct ObjectInfoCB {
 			int InstanceIndex;
@@ -200,12 +203,20 @@ public:
 			binder _set SRV(0, InstanceTransforms);
 			binder _set SRV(1, GeometryTransforms);
 			binder _set CBV(0, Camera);
+
+			binder _set PixelShaderBindings();
+
+			binder _set SMP_Static(0, Sampler::Linear());
 		}
 
 		void Locals(gObj<GraphicsBinder> binder) {
 			binder _set VertexShaderBindings();
 			
 			binder _set CBV(1, ObjectInfo);
+
+			binder _set PixelShaderBindings();
+
+			binder _set SRV(0, Texture);
 		}
 	};
 	gObj<Pipeline> pipeline;
@@ -222,7 +233,10 @@ public:
 		Lighting = __create Buffer_CB<LightingCB>();
 		GeometryTransforms = __create Buffer_SRV<float4x3>(desc->getTransformsBuffer().Count);
 		InstanceTransforms = __create Buffer_SRV<float4x4>(desc->Instances().Count);
-
+		Textures = new gObj<Texture2D>[desc->getTextures().Count];
+		TextureCount = desc->getTextures().Count;
+		for (int i = 0; i < TextureCount; i++)
+			Textures[i] = __create Texture2D_SRV(desc->getTextures().Data[i]);
 		pipeline = __create Pipeline<Pipeline>();
 		pipeline->Camera = Camera;
 		pipeline->GeometryTransforms = GeometryTransforms;
@@ -275,6 +289,11 @@ public:
 			manager _load AllToGPU(GeometryTransforms);
 		}
 
+		if (+(elements & SceneElement::Textures)) {
+			for (int i = 0; i < TextureCount; i++)
+				manager _load AllToGPU(Textures[i]);
+		}
+
 		if (+(elements & SceneElement::InstanceTransforms))
 		{
 			float4x4* transforms = new float4x4[desc->Instances().Count];
@@ -315,6 +334,13 @@ public:
 				pipeline->ObjectInfo.TransformIndex = geometry.TransformIndex;
 				pipeline->ObjectInfo.MaterialIndex = geometry.MaterialIndex;
 
+				pipeline->Texture = nullptr;
+				if (geometry.MaterialIndex != -1)
+				{
+					int textureIndex = desc->Materials().Data[geometry.MaterialIndex].DiffuseMap;
+					if (textureIndex != -1)
+						pipeline->Texture = Textures[textureIndex];
+				}
 				manager _dispatch IndexedTriangles(geometry.IndexCount, geometry.StartIndex);
 			}
 		}

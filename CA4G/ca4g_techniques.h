@@ -3,6 +3,7 @@
 
 #include "ca4g_definitions.h"
 #include "ca4g_resources.h"
+#include "ca4g_collections.h"
 
 namespace CA4G {
 	
@@ -244,6 +245,7 @@ namespace CA4G {
 		gObj<Texture2D> Texture2D_SRV(int width, int height, int mips = 0, int arrayLength = 1) {
 			return Texture2D_SRV(Formats<T>::Value, width, height, mips, arrayLength);
 		}
+		gObj<Texture2D> Texture2D_SRV(CA4G::string filePath);
 
 		// Creates a bidimensional texture to be used as a RWTexture2D in a shader or a render target.
 		// if mips == 0 all possible mips are allocated.

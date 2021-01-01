@@ -1,5 +1,6 @@
 #include "private_ca4g_presenter.h"
 //#include "ca4g_techniques.h"
+#include "ca4g_imaging.h"
 
 namespace CA4G {
 
@@ -179,6 +180,17 @@ namespace CA4G {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture2DDescription(format, desc, width, height, mips, arrayLength);
 		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Texture2D>();
+	}
+
+	gObj<Texture2D> Creating::Texture2D_SRV(string filePath)
+	{
+		auto data = TextureData::LoadFromFile(filePath.c_str());
+
+		gObj<Texture2D> texture = Texture2D_SRV(data->Format, data->Width, data->Height, data->MipMaps, data->ArraySlices);
+
+		texture->copy->FromPtr(data->Data, true);
+
+		return texture;
 	}
 
 	gObj<Texture2D> Creating::Texture2D_UAV(DXGI_FORMAT format, int width, int height, int mips, int arrayLength) {
