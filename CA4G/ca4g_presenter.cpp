@@ -480,6 +480,23 @@ namespace CA4G {
 		cmdList->ClearDepthStencilView(view->getDSVHandle(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, 0, nullptr);
 	}
 
+	void CopyManager::Clearing::UAV(gObj<ResourceView> uav, const unsigned int values[4])
+	{
+		auto cmdList = ((DX_CmdWrapper*)this->wrapper->__InternalDXCmdWrapper)->cmdList;
+		DX_ResourceWrapper* resourceWrapper = (DX_ResourceWrapper*)uav->__InternalDXWrapper;
+		DX_ViewWrapper* view = (DX_ViewWrapper*)uav->__InternalViewWrapper;
+		resourceWrapper->AddUAVBarrier(cmdList);
+		long gpuHandleIndex = resourceWrapper->dxWrapper->gpu_csu->AllocateInFrame(1);
+		auto cpuHandleAtVisibleHeap = resourceWrapper->dxWrapper->gpu_csu->getCPUVersion(gpuHandleIndex);
+		auto gpuHandle = resourceWrapper->dxWrapper->gpu_csu->getGPUVersion(gpuHandleIndex);
+		auto cpuHandle = view->getUAVHandle();
+		resourceWrapper->dxWrapper->device->CopyDescriptorsSimple(1, cpuHandleAtVisibleHeap, cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		cmdList->ClearUnorderedAccessViewUint(
+			gpuHandle,
+			cpuHandle,
+			resourceWrapper->resource, values, 0, nullptr);
+	}
+
 #pragma endregion
 
 #pragma region Copy Manager

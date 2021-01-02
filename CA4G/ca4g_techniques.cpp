@@ -119,7 +119,7 @@ namespace CA4G {
 		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr).Dynamic_Cast<Buffer>();
+		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	int MaxMipsFor(int dimension) {
@@ -156,7 +156,7 @@ namespace CA4G {
 	gObj<Texture1D> Creating::Texture1D_UAV(DXGI_FORMAT format, int width, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture1DDescription(format, desc, width, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr).Dynamic_Cast<Texture1D>();
+		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Texture1D>();
 	}
 
 	void FillTexture2DDescription(DXGI_FORMAT format, D3D12_RESOURCE_DESC& desc, long width, int height, int mips, int arrayLength, D3D12_RESOURCE_FLAGS flag = D3D12_RESOURCE_FLAG_NONE) {
@@ -195,13 +195,13 @@ namespace CA4G {
 
 	gObj<Texture2D> Creating::Texture2D_UAV(DXGI_FORMAT format, int width, int height, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
-		FillTexture2DDescription(format, desc, width, height, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS | D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr).Dynamic_Cast<Texture2D>();
+		FillTexture2DDescription(format, desc, width, height, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Texture2D>();
 	}
 
 	gObj<Texture2D> Creating::Texture2D_RT(DXGI_FORMAT format, int width, int height, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
-		FillTexture2DDescription(format, desc, width, height, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		FillTexture2DDescription(format, desc, width, height, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr).Dynamic_Cast<Texture2D>();
 	}
 

@@ -164,7 +164,7 @@ namespace CA4G {
 							break;
 							case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
 								DX_ResourceWrapper* iresource = DX_Wrapper::InternalResource(resource);
-								iresource->AddBarrier(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+								iresource->AddBarrier(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 								break;
 							}
 						}

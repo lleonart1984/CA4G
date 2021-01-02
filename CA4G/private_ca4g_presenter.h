@@ -421,6 +421,16 @@ namespace CA4G {
 			cmdList->ResourceBarrier(1, &barrier);
 			this->LastUsageState = dst;
 		}
+
+		// Creates a barrier in a cmd list to trasition usage states for this resource.
+		void AddUAVBarrier(DX_CommandList cmdList) {
+			// If the resource is used as UAV
+			// Put a barrier to finish any pending read/write op
+			D3D12_RESOURCE_BARRIER barrier = { };
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+			barrier.UAV.pResource = this->resource;
+			cmdList->ResourceBarrier(1, &barrier);
+		}
 	};
 
 	struct DX_ViewWrapper {
@@ -463,6 +473,8 @@ namespace CA4G {
 			switch (type) {
 			case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
 				return getSRVHandle();
+			case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+				return getUAVHandle();
 			case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
 				return getCBVHandle();
 			}
@@ -521,6 +533,42 @@ namespace CA4G {
 			}
 		}
 
+		void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC& d)
+		{
+			switch (this->ViewDimension) {
+			case D3D12_RESOURCE_DIMENSION_BUFFER:
+				d.Buffer.CounterOffsetInBytes = 0;
+				d.Buffer.FirstElement = arrayStart;
+				d.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+				d.Buffer.NumElements = arrayCount;
+				d.Buffer.StructureByteStride = elementStride;
+				d.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+				d.Format = DXGI_FORMAT_UNKNOWN;// !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+				d.Texture1DArray.ArraySize = arrayCount;
+				d.Texture1DArray.FirstArraySlice = arrayStart;
+				d.Texture1DArray.MipSlice = mipStart;
+				d.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
+				d.Format = !resource->resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+				d.Texture2DArray.ArraySize = arrayCount;
+				d.Texture2DArray.FirstArraySlice = arrayStart;
+				d.Texture2DArray.MipSlice = mipStart;
+				d.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+				d.Format = !resource->resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+				d.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+				d.Texture3D.WSize = arrayCount;
+				d.Texture3D.FirstWSlice = arrayStart;
+				d.Texture3D.MipSlice = mipStart;
+				d.Format = !resource->resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+				break;
+			}
+		}
+
 		void CreateVBV(D3D12_VERTEX_BUFFER_VIEW& desc) {
 			desc = { };
 			desc.BufferLocation = !resource->resource ? 0 : resource->resource->GetGPUVirtualAddress();
@@ -566,6 +614,25 @@ namespace CA4G {
 			mutex.Release();
 			return srv_cached_handle;
 		}
+
+		int getUAV() {
+			if ((handle_mask & 2) != 0)
+				return uav_cached_handle;
+
+			mutex.Acquire();
+			if ((handle_mask & 2) == 0)
+			{
+				D3D12_UNORDERED_ACCESS_VIEW_DESC d;
+				ZeroMemory(&d, sizeof(D3D12_UNORDERED_ACCESS_VIEW_DESC));
+				CreateUAVDesc(d);
+				uav_cached_handle = resource->dxWrapper->cpu_csu->AllocateNewHandle();
+				resource->dxWrapper->device->CreateUnorderedAccessView(!resource ? nullptr : resource->resource, nullptr, &d, resource->dxWrapper->cpu_csu->getCPUVersion(uav_cached_handle));
+				handle_mask |= 2;
+			}
+			mutex.Release();
+			return uav_cached_handle;
+		}
+
 
 		int getCBV() {
 			if ((handle_mask & 4) != 0)
@@ -638,6 +705,10 @@ namespace CA4G {
 
 		D3D12_CPU_DESCRIPTOR_HANDLE getCBVHandle() {
 			return resource->dxWrapper->cpu_csu->getCPUVersion(getCBV());
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getUAVHandle() {
+			return resource->dxWrapper->cpu_csu->getCPUVersion(getUAV());
 		}
 
 #pragma endregion

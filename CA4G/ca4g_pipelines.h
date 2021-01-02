@@ -8211,7 +8211,10 @@ namespace CA4G {
 
 		// Use this method to load a bytecode from a memory buffer
 		template<int count>
-		static D3D12_SHADER_BYTECODE FromMemory(const byte(&bytecodeData)[count]);
+		static D3D12_SHADER_BYTECODE FromMemory(const byte(&bytecodeData)[count])
+		{
+			return FromMemory(bytecodeData, count);
+		}
 	};
 
 	// Represents the shader stage a resource is bound to.
@@ -9156,7 +9159,33 @@ namespace CA4G {
 		virtual void Locals(gObj<GraphicsBinder> binder) { }
 	};
 
+	// Used to show complexity
+	class ShowComplexityPipeline : public GraphicsPipelineBindings {
+	public:
+		// UAV to output the complexity
+		gObj<Texture2D> Complexity;
 
+		// Render Target
+		gObj<Texture2D> RenderTarget;
+
+	protected:
+		void Setup() {
+			this->set->VertexShader(ShaderLoader::FromMemory(cso_DrawScreen_VS));
+			this->set->PixelShader(ShaderLoader::FromMemory(cso_DrawComplexity_PS));
+			this->set->InputLayout({
+					VertexElement(VertexElementType::Float, 2, VertexElementSemantic::Position)
+				});
+		}
+
+		void Globals(gObj<GraphicsBinder> binder)
+		{
+			binder->set->RTV(0, RenderTarget);
+			
+			binder->set->PixelShaderBindings();
+
+			binder->set->SRV(0, Complexity);
+		}
+	};
 }
 
 #endif
