@@ -144,7 +144,6 @@ public:
 
 #pragma endregion
 
-
 #pragma region Draw simple scene
 
 class SceneSample : public Technique, public IManageScene {

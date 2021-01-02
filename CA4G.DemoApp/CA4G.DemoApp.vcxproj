@@ -180,6 +180,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CA4G.DemoApp.h" />
+    <ClInclude Include="ca4g_ImGuiTraits.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="ImGui\imconfig.h" />
     <ClInclude Include="ImGui\imgui.h" />

@@ -592,7 +592,7 @@ namespace CA4G {
 			}
 		}
 
-		void Load(const char* filePath, OBJImportMode mode)
+		void Load(string filePath, OBJImportMode mode)
 		{
 			list<float3> positions;
 			list<float3> normals;
@@ -618,7 +618,7 @@ namespace CA4G {
 			FILE* stream;
 
 			errno_t err;
-			if (err = fopen_s(&stream, filePath, "r"))
+			if (err = fopen_s(&stream, filePath.c_str(), "r"))
 			{
 				return;
 			}
@@ -777,7 +777,7 @@ namespace CA4G {
 
 #pragma endregion
 
-	gObj<SceneBuilder> CA4G::OBJLoader::Load(const char* filePath, OBJImportMode mode)
+	gObj<SceneBuilder> CA4G::OBJLoader::Load(string filePath, OBJImportMode mode)
 	{
 		OBJLoaderState state;
 		state.Load(filePath, mode);

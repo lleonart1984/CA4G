@@ -11,6 +11,6 @@ sampler Samp : register(s0);
 
 float4 main(PS_IN pIn) : SV_TARGET
 {
-	return max(0, dot(pIn.N, normalize(float3(1,1,1))))* Texture.Sample(Samp, pIn.C);
-	//return float4(pIn.N, 1);
+	//return float4(1,1,1,1);// max(0, dot(pIn.N, normalize(float3(1,1,1))))* Texture.Sample(Samp, pIn.C);
+	return float4(pIn.N, 1);
 }

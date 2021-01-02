@@ -7,11 +7,11 @@ using namespace CA4G;
 
 typedef class BunnyScene main_scene;
 
-LPSTR desktop_directory()
+CA4G::string desktop_directory()
 {
 	static char path[MAX_PATH + 1];
 	SHGetSpecialFolderPathA(HWND_DESKTOP, path, CSIDL_DESKTOP, FALSE);
-	return path;
+	return CA4G::string(path);
 }
 
 class BunnyScene : public SceneManager {
@@ -24,20 +24,21 @@ public:
 
 	void SetupScene() {
 
-		camera.Position = float3(0, 0, 4);
+		camera.Position = float3(0, 0, 2);
 
-		char* filePath = desktop_directory();
-		strcat_s(filePath, MAX_PATH, "\\Models\\bunny.obj");
+		CA4G::string desktopPath = desktop_directory();
+		
+		CA4G::string lucyPath = desktopPath + CA4G::string("\\Models\\lucy2.obj");
 
-		auto bunnyScene = OBJLoader::Load(filePath);
+		auto bunnyScene = OBJLoader::Load(lucyPath);
 		bunnyScene->Normalize(
-			SceneNormalization::Maximum | 
+			SceneNormalization::Scale |
+			SceneNormalization::Maximum |
 			//SceneNormalization::MinX |
 			//SceneNormalization::MinY |
 			//SceneNormalization::MinZ |
 			SceneNormalization::Center
 		);
-
 		scene->appendScene(bunnyScene);
 
 		InitialTransforms = new float4x4[scene->Instances().Count];
@@ -49,7 +50,7 @@ public:
 
 	virtual void Animate(float time, int frame, SceneElement freeze = SceneElement::None) override {
 		scene->Instances().Data[0].Transform =
-			mul(Transforms::RotateY(time), InitialTransforms[0]);
+			mul(InitialTransforms[0], Transforms::RotateY(time));
 		OnUpdated(SceneElement::InstanceTransforms);
 	}
 };

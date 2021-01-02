@@ -12,6 +12,8 @@ using namespace CA4G;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+#include "ca4g_ImGuiTraits.h"
+
 // Main code
 int main(int, char**)
 {
@@ -106,6 +108,9 @@ int main(int, char**)
 		{
 			ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+			RenderGUI<IManageScene>(technique);
+
 			ImGui::End();
 		}
 

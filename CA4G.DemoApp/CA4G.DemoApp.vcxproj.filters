@@ -60,6 +60,9 @@
     <ClInclude Include="main_scene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ca4g_ImGuiTraits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CA4G.DemoApp.cpp">

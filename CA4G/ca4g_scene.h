@@ -391,7 +391,7 @@ namespace CA4G {
 
 	class OBJLoader {
 	public:
-		static gObj<SceneBuilder> Load(const char* filePath, OBJImportMode mode = OBJImportMode::SingleInstance);
+		static gObj<SceneBuilder> Load(string filePath, OBJImportMode mode = OBJImportMode::SingleInstance);
 	};
 
 	class Camera

@@ -5,11 +5,9 @@
 
 namespace CA4G {
 
-	class IManageScene {
-	protected:
+	struct IManageScene {
 		gObj<SceneManager> scene = nullptr;
 		SceneVersion sceneVersion;
-	public:
 		virtual void SetSceneManager(gObj<SceneManager> scene) {
 			this->scene = scene;
 		}
