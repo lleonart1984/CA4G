@@ -28,7 +28,7 @@ public:
 
 		CA4G::string desktopPath = desktop_directory();
 		
-		CA4G::string lucyPath = desktopPath + CA4G::string("\\Models\\lucy2.obj");
+		CA4G::string lucyPath = desktopPath + CA4G::string("\\Models\\bunny.obj");
 
 		auto bunnyScene = OBJLoader::Load(lucyPath);
 		bunnyScene->Normalize(
