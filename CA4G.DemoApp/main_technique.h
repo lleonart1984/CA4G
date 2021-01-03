@@ -7,7 +7,8 @@ using namespace CA4G;
 
 //typedef class AsyncSample main_technique;
 //typedef class TriangleSample main_technique;
-typedef class UAVSample main_technique;
+typedef class SceneSample main_technique;
+//typedef class UAVSample main_technique;
 
 #pragma region Async Sample
 
@@ -72,12 +73,13 @@ public:
 			//__set FillMode();
 		}
 
-		void Globals(gObj<GraphicsBinder> binder) {
-			binder _set RTV(0, RenderTarget);
-
+		void Bindings(gObj<GraphicsBinder> binder) {
+			
+			binder _set BindingsOnSet();
+			
 			binder _set PixelShaderBindings();
+			binder _set RTV(0, RenderTarget);
 			binder _set SRV(0, Texture);
-
 			binder _set SMP_Static(0, Sampler::Linear());
 		}
 	};
@@ -193,29 +195,28 @@ public:
 			__set DepthTest();
 		}
 
-		void Globals(gObj<GraphicsBinder> binder) {
-			binder _set RTV(0, RenderTarget);
-			binder _set DSV(DepthBuffer);
+		void Bindings(gObj<GraphicsBinder> binder) {
+			binder _set BindingsOnSet();
+			{
+				binder _set PixelShaderBindings();
+				binder _set SMP_Static(0, Sampler::Linear());
+				binder _set RTV(0, RenderTarget);
+				binder _set DSV(DepthBuffer);
 
-			binder _set VertexShaderBindings();
+				binder _set VertexShaderBindings();
+				binder _set SRV(0, InstanceTransforms);
+				binder _set SRV(1, GeometryTransforms);
+				binder _set CBV(0, Camera);
+			}
 
-			binder _set SRV(0, InstanceTransforms);
-			binder _set SRV(1, GeometryTransforms);
-			binder _set CBV(0, Camera);
+			binder _set BindingsOnDispatch();
+			{
+				binder _set VertexShaderBindings();
+				binder _set CBV(1, ObjectInfo);
 
-			binder _set PixelShaderBindings();
-
-			binder _set SMP_Static(0, Sampler::Linear());
-		}
-
-		void Locals(gObj<GraphicsBinder> binder) {
-			binder _set VertexShaderBindings();
-			
-			binder _set CBV(1, ObjectInfo);
-
-			binder _set PixelShaderBindings();
-
-			binder _set SRV(0, Texture);
+				binder _set PixelShaderBindings();
+				binder _set SRV(0, Texture);
+			}
 		}
 	};
 	gObj<Pipeline> pipeline;
@@ -537,6 +538,198 @@ public:
 		manager _dispatch Triangles(6);
 	}
 };
+
+#pragma endregion
+
+#pragma region Basic Raycasting
+
+//class BasicRaycastSample : public Technique, public IManageScene {
+//public:
+//
+//	~BasicRaycastSample() {}
+//
+//	gObj<Buffer> VertexBuffer;
+//	gObj<Buffer> IndexBuffer;
+//	gObj<Buffer> Camera;
+//	gObj<Buffer> GeometryTransforms;
+//	gObj<Buffer> InstanceTransforms;
+//	gObj<Texture2D> OutputImage;
+//
+//	struct CameraCB {
+//		float4x4 ProjectionInverse;
+//		float4x4 ViewInverse;
+//	};
+//
+//	struct RTX_Pipeline : public RaytracingPipelineBindings {
+//
+//		gObj<Texture2D> RenderTarget;
+//		gObj<Texture2D> CountingBuffer;
+//		gObj<Buffer> InstanceTransforms;
+//		gObj<Buffer> GeometryTransforms;
+//		gObj<Buffer> Camera;
+//
+//		struct ObjectInfoCB {
+//			int InstanceIndex;
+//			int TransformIndex;
+//			int MaterialIndex;
+//		} ObjectInfo;
+//
+//		// Inherited via GraphicsPipelineBindings
+//		void Setup() override {
+//			__set VertexShader(ShaderLoader::FromFile("./Shaders/Samples/Basic_VS.cso"));
+//			__set PixelShader(ShaderLoader::FromFile("./Shaders/Samples/Counting_PS.cso"));
+//			__set InputLayout(SceneVertex::Layout());
+//		}
+//
+//		void Globals(gObj<GraphicsBinder> binder) {
+//			binder _set VertexShaderBindings();
+//
+//			binder _set SRV(0, InstanceTransforms);
+//			binder _set SRV(1, GeometryTransforms);
+//			binder _set CBV(0, Camera);
+//
+//			binder _set PixelShaderBindings();
+//
+//			binder _set UAV(0, CountingBuffer);
+//		}
+//
+//		void Locals(gObj<GraphicsBinder> binder) {
+//			binder _set VertexShaderBindings();
+//
+//			binder _set CBV(1, ObjectInfo);
+//		}
+//	};
+//	gObj<Pipeline> pipeline;
+//	gObj<ShowComplexityPipeline> showComplexity;
+//	gObj<Buffer> screenVertices;
+//
+//	// Inherited via Technique
+//	virtual void OnLoad() override {
+//
+//		auto desc = scene->getScene();
+//
+//		// Allocate Memory for scene elements
+//		VertexBuffer = __create Buffer_VB<SceneVertex>(desc->Vertices().Count);
+//		IndexBuffer = __create Buffer_IB<int>(desc->Indices().Count);
+//		Camera = __create Buffer_CB<CameraCB>();
+//		GeometryTransforms = __create Buffer_SRV<float4x3>(desc->getTransformsBuffer().Count);
+//		InstanceTransforms = __create Buffer_SRV<float4x4>(desc->Instances().Count);
+//		Complexity = __create Texture2D_UAV<uint>(render_target->Width, render_target->Height, 1, 1);
+//
+//		pipeline = __create Pipeline<Pipeline>();
+//		pipeline->Camera = Camera;
+//		pipeline->GeometryTransforms = GeometryTransforms;
+//		pipeline->InstanceTransforms = InstanceTransforms;
+//		pipeline->CountingBuffer = __create Texture2D_DSV(render_target->Width, render_target->Height);
+//
+//		showComplexity = __create Pipeline<ShowComplexityPipeline>();
+//		screenVertices = __create Buffer_VB<float2>(6);
+//		screenVertices _copy FromList({
+//			float2(-1, -1), float2(1, -1), float2(1, 1),
+//			float2(-1, -1), float2(1, 1), float2(-1, 1)
+//			});
+//
+//		__dispatch member_collector(UpdateDirtyElements);
+//
+//		__dispatch member_collector(LoadScreenVertices);
+//	}
+//
+//	void LoadScreenVertices(gObj<GraphicsManager> manager) {
+//		manager _load AllToGPU(screenVertices);
+//	}
+//
+//	void UpdateDirtyElements(gObj<GraphicsManager> manager) {
+//
+//		auto elements = scene->Updated(sceneVersion);
+//		auto desc = scene->getScene();
+//
+//		if (+(elements & SceneElement::Vertices))
+//		{
+//			VertexBuffer _copy FromPtr(desc->Vertices().Data);
+//			manager _load AllToGPU(VertexBuffer);
+//		}
+//
+//		if (+(elements & SceneElement::Indices))
+//		{
+//			IndexBuffer _copy FromPtr(desc->Indices().Data);
+//			manager _load AllToGPU(IndexBuffer);
+//		}
+//
+//		if (+(elements & SceneElement::Camera))
+//		{
+//			float4x4 proj, view;
+//			scene->getCamera().GetMatrices(render_target->Width, render_target->Height, view, proj);
+//			Camera _copy FromValue(CameraCB{
+//					proj,
+//					view
+//				});
+//			manager _load AllToGPU(Camera);
+//		}
+//
+//		if (+(elements & SceneElement::GeometryTransforms))
+//		{
+//			GeometryTransforms _copy FromPtr(desc->getTransformsBuffer().Data);
+//			manager _load AllToGPU(GeometryTransforms);
+//		}
+//
+//		if (+(elements & SceneElement::InstanceTransforms))
+//		{
+//			float4x4* transforms = new float4x4[desc->Instances().Count];
+//			for (int i = 0; i < desc->Instances().Count; i++)
+//				transforms[i] = desc->Instances().Data[i].Transform;
+//
+//			InstanceTransforms _copy FromPtr(transforms);
+//			manager _load AllToGPU(InstanceTransforms);
+//			delete[] transforms;
+//		}
+//	}
+//
+//	virtual void OnDispatch() override {
+//		// Update dirty elements
+//		__dispatch member_collector(UpdateDirtyElements);
+//
+//		// Draw current Frame
+//		__dispatch member_collector(DrawScene);
+//
+//		__dispatch member_collector(DrawComplexity);
+//	}
+//
+//	void DrawScene(gObj<GraphicsManager> manager) {
+//		pipeline->RenderTarget = render_target;
+//		pipeline->CountingBuffer = Complexity;
+//
+//		manager _set Pipeline(pipeline);
+//		manager _set VertexBuffer(VertexBuffer);
+//		manager _set IndexBuffer(IndexBuffer);
+//		manager _set Viewport(render_target->Width, render_target->Height);
+//
+//		manager _clear RT(render_target, float3(0.2f, 0.2f, 0.5f));
+//		manager _clear UAV(Complexity, uint4(0));
+//
+//		auto desc = scene->getScene();
+//
+//		for (int i = 0; i < desc->Instances().Count; i++) {
+//			pipeline->ObjectInfo.InstanceIndex = i;
+//			InstanceDescription instance = desc->Instances().Data[i];
+//			for (int j = 0; j < instance.Count; j++) {
+//				GeometryDescription geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
+//				pipeline->ObjectInfo.TransformIndex = geometry.TransformIndex;
+//				pipeline->ObjectInfo.MaterialIndex = geometry.MaterialIndex;
+//				manager _dispatch IndexedTriangles(geometry.IndexCount, geometry.StartIndex);
+//			}
+//		}
+//	}
+//
+//	void DrawComplexity(gObj<GraphicsManager> manager) {
+//		showComplexity->RenderTarget = render_target;
+//		showComplexity->Complexity = Complexity;
+//
+//		manager _set Pipeline(showComplexity);
+//		manager _set VertexBuffer(screenVertices);
+//		manager _set Viewport(render_target->Width, render_target->Height);
+//		manager _dispatch Triangles(6);
+//	}
+//};
 
 
 #pragma endregion

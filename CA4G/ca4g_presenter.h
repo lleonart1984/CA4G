@@ -253,27 +253,28 @@ namespace CA4G {
 	class RaytracingManager : public GraphicsManager {
 		friend GPUScheduler;
 	protected:
-		RaytracingManager() : GraphicsManager(), set(new Setter(this)) 
+		RaytracingManager() : GraphicsManager()
+			//, set(new Setter(this)) 
 		{
 		}
 	public:
-		class Setter {
-			ICmdManager* wrapper;
-		public:
-			Setter(ICmdManager* wrapper) :wrapper(wrapper) {
-			}
-			void Pipeline(gObj<IPipelineBindings> bindings);
+		//class Setter {
+		//	ICmdManager* wrapper;
+		//public:
+		//	Setter(ICmdManager* wrapper) :wrapper(wrapper) {
+		//	}
+		//	void Pipeline(gObj<IPipelineBindings> bindings);
 
-			void Program(gObj<IRTProgram> program);
+		//	void Program(gObj<IRTProgram> program);
 
-			// Commit all local bindings for this ray generation shader
-			void RayGeneration(gObj<RayGenerationHandle> program);
+		//	// Commit all local bindings for this ray generation shader
+		//	void RayGeneration(gObj<RayGenerationHandle> program);
 
-			void Miss(gObj<MissHandle> program, int index);
+		//	void Miss(gObj<MissHandle> program, int index);
 
-			void HitGroup(gObj<HitGroupHandle> group, int geometryIndex,
-				int rayContribution = 0, int multiplier = 1, int instanceContribution = 0);
-		}* const set;
+		//	void HitGroup(gObj<HitGroupHandle> group, int geometryIndex,
+		//		int rayContribution = 0, int multiplier = 1, int instanceContribution = 0);
+		//}* const set;
 
 	};
 

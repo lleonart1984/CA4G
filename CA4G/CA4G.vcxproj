@@ -180,10 +180,12 @@
     <ClInclude Include="ca4g_techniques.h" />
     <ClInclude Include="private_ca4g_definitions.h" />
     <ClInclude Include="private_ca4g_descriptors.h" />
+    <ClInclude Include="private_ca4g_pipelines.h" />
     <ClInclude Include="private_ca4g_presenter.h" />
     <ClInclude Include="private_ca4g_sync.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ca4g_dxr_support.cpp" />
     <ClCompile Include="ca4g_errors.cpp" />
     <ClCompile Include="ca4g_gmath.cpp" />
     <ClCompile Include="ca4g_imaging.cpp" />

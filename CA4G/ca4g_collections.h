@@ -228,6 +228,14 @@ namespace CA4G {
 			delete[] elements;
 		}
 
+		/// pushes an item at the begining
+		void push(T item) {
+			add(item);
+			for (int i = count - 1; i > 0; i--)
+				elements[i] = elements[i - 1];
+			elements[0] = item;
+		}
+
 		int add(T item) {
 			if (count == capacity)
 			{

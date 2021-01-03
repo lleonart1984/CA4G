@@ -13,7 +13,6 @@
 namespace CA4G {
 
 	class Presenter;
-	class DeviceManager;
 	class Creating;
 	class Loading;
 	class Dispatcher;
@@ -34,6 +33,9 @@ namespace CA4G {
 	class RaytracingManager;
 	class StaticPipelineBindingsBase;
 	template<typename ...PSS> class StaticPipelineBindings;
+	class ComputePipelineBindings;
+	class GraphicsPipelineBindings;
+	class RaytracingPipelineBindings;
 
 	// Internal Management
 	struct GPUScheduler;

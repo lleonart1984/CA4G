@@ -2,7 +2,6 @@
 #define CA4G_PIPELINES_H
 
 #include "ca4g_presenter.h"
-#include "ca4g_dxr_support.h"
 #include "ca4g_collections.h"
 
 namespace CA4G {
@@ -8776,12 +8775,18 @@ namespace CA4G {
 
 #pragma endregion
 
+	class InternalBindings;
+	class InternalPipelineWrapper;
+
 	class ComputeBinder {
 		friend StaticPipelineBindingsBase;
+		friend RaytracingPipelineBindings;
+		friend InternalPipelineWrapper;
 		friend GraphicsBinder;
 		friend RaytracingBinder;
+
 	protected:
-		void* __InternalBindingObject;
+		InternalBindings* __InternalBindingObject;
 	public:
 		ComputeBinder();
 		virtual ~ComputeBinder() {
@@ -8795,6 +8800,7 @@ namespace CA4G {
 
 			D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY::D3D12_SHADER_VISIBILITY_ALL;
 			int space = 0;
+			bool collectGlobal = true;
 
 			void AddConstant(int slot, void* data, int size);
 
@@ -8805,6 +8811,14 @@ namespace CA4G {
 			void AddStaticSampler(int slot, const Sampler& sampler);
 
 		public:
+			void BindingsOnSet() {
+				this->collectGlobal = true;
+			}
+
+			void BindingsOnDispatch() {
+				this->collectGlobal = false;
+			}
+
 			// Change the space for the next bindings
 			void Space(int space) { this->space = space; }
 
@@ -8954,9 +8968,9 @@ namespace CA4G {
 			Setting(RaytracingBinder* binder) : ComputeBinder::Setting(binder) {}
 			void AddADS(int slot, void* resource);
 		public:
-			void ADS(int slot, gObj<RTScene>& const scene) {
-				AddADS(slot, (void*)&scene);
-			}
+			//void ADS(int slot, gObj<RTScene>& const scene) {
+			//	AddADS(slot, (void*)&scene);
+			//}
 		} * const set;
 	};
 
@@ -8981,25 +8995,12 @@ namespace CA4G {
 
 		void OnDispatch(ICmdManager* cmdWrapper);
 
-		virtual gObj<ComputeBinder> OnCollectGlobalBindings() = 0;
-
-		virtual gObj<ComputeBinder> OnCollectLocalBindings() = 0;
+		virtual gObj<ComputeBinder> OnCollectBindings() = 0;
 
 		// When implemented by users, this method will setup the pipeline object after created
 		// Use this method to specify how to load shaders and set other default pipeline settings
 		virtual void Setup() = 0;
 	};
-
-	template<typename PSS>
-	unsigned long  StreamTypeBits() {
-		return (1 << (int)PSS::PipelineState_Type);// | StreamTypeBits<A...>();
-	}
-
-	template<typename PSS, typename R, typename ...A>
-	unsigned long  StreamTypeBits() {
-		return (1 << (int)PSS::PipelineState_Type) | StreamTypeBits<R, A...>();
-	}
-
 
 	// -- Abstract pipeline object (can be Graphics or Compute)
 	// Allows creation of root signatures and leaves abstract the pipeline state object creation
@@ -9101,21 +9102,14 @@ namespace CA4G {
 	> {
 
 	private:
-		gObj<ComputeBinder> OnCollectGlobalBindings() {
+		gObj<ComputeBinder> OnCollectBindings() {
 			gObj<ComputeBinder> binder = new ComputeBinder();
-			Globals(binder);
-			return binder;
-		}
-
-		gObj<ComputeBinder> OnCollectLocalBindings() {
-			gObj<ComputeBinder> binder = new ComputeBinder();
-			Locals(binder);
+			Bindings(binder);
 			return binder;
 		}
 
 	protected:
-		virtual void Globals(gObj<ComputeBinder> binder) { }
-		virtual void Locals(gObj<ComputeBinder> binder) { }
+		virtual void Bindings(gObj<ComputeBinder> binder) { }
 	};
 
 	// Used as a common graphics pipeline binding object
@@ -9141,22 +9135,13 @@ namespace CA4G {
 		RootSignatureStateManager
 	> {
 	protected:
-		gObj<ComputeBinder> OnCollectGlobalBindings() override {
+		gObj<ComputeBinder> OnCollectBindings() override {
 			gObj<ComputeBinder> binder = new GraphicsBinder();
-			Globals(binder.Dynamic_Cast<GraphicsBinder>());
+			Bindings(binder.Dynamic_Cast<GraphicsBinder>());
 			return binder;
 		}
 
-		gObj<ComputeBinder> OnCollectLocalBindings() override {
-			gObj<ComputeBinder> binder = new GraphicsBinder();
-			Locals(binder.Dynamic_Cast<GraphicsBinder>());
-			return binder;
-		}
-	protected:
-
-		virtual void Globals(gObj<GraphicsBinder> binder) { }
-
-		virtual void Locals(gObj<GraphicsBinder> binder) { }
+		virtual void Bindings(gObj<GraphicsBinder> binder) { }
 	};
 
 	// Used to show complexity
