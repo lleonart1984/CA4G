@@ -1,6 +1,8 @@
 #ifndef PRIVATE_PIPELINES_H
 #define PRIVATE_PIPELINES_H
 
+#include "private_ca4g_presenter.h"
+
 namespace CA4G {
 
 	// Represents a binding of a resource (or resource array) to a shader slot.
@@ -29,7 +31,8 @@ namespace CA4G {
 		};
 	};
 
-	struct InternalBindings {
+	struct InternalBindings
+	{
 		// Used to collect all constant, shader, unordered views or sampler bindings
 		list<SlotBinding> bindings;
 
@@ -228,56 +231,12 @@ namespace CA4G {
 		// DX12 wrapper.
 		DX_Wrapper* wrapper = nullptr;
 		// Gets or sets the root signature for this bindings
-		ID3D12RootSignature* rootSignature = nullptr;
+		CComPtr<ID3D12RootSignature> rootSignature = nullptr;
 		// Gets or sets the size of the root signature.
 		int rootSignatureSize;
 		// Gets or sets the pipeline object built for the pipeline
 		ID3D12PipelineState* pso = nullptr;
-
-		// Builds the root signature according to the binder object.
-		void BuildRootSignature(D3D12_ROOT_SIGNATURE_FLAGS flags) {
-#pragma region Creating Root Signature
-
-			auto bindings = binder->__InternalBindingObject->bindings;
-
-			D3D12_ROOT_PARAMETER* parameters = new D3D12_ROOT_PARAMETER[bindings.size()];
-			for (int i = 0; i < bindings.size(); i++)
-				parameters[i] = bindings[i].Root_Parameter;
-
-			D3D12_ROOT_SIGNATURE_DESC desc;
-			desc.pParameters = parameters;
-			desc.NumParameters = bindings.size();
-			desc.pStaticSamplers = binder->__InternalBindingObject->Static_Samplers;
-			desc.NumStaticSamplers = binder->__InternalBindingObject->StaticSamplerMax;
-			desc.Flags = flags;
-
-			ID3DBlob* signatureBlob;
-			ID3DBlob* signatureErrorBlob;
-
-			D3D12_VERSIONED_ROOT_SIGNATURE_DESC d = {};
-			d.Desc_1_0 = desc;
-			d.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
-
-			auto hr = D3D12SerializeVersionedRootSignature(&d, &signatureBlob, &signatureErrorBlob);
-
-			if (hr != S_OK)
-			{
-				throw CA4GException::FromError(CA4G_Errors_BadSignatureConstruction, "Error serializing root signature");
-			}
-
-			hr = wrapper->device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
-
-			if (hr != S_OK)
-			{
-				throw CA4GException::FromError(CA4G_Errors_BadSignatureConstruction, "Error creating root signature");
-			}
-
-			delete[] parameters;
-
-#pragma endregion
-		}
 	};
-
 
 }
 

@@ -7,9 +7,6 @@
 namespace CA4G {
 
 	class StaticPipelineBindingsBase;
-	class ComputeBinder;
-	class GraphicsBinder;
-	class RaytracingBinder;
 
 #pragma region Compiled Shaders
 
@@ -8784,6 +8781,14 @@ namespace CA4G {
 		friend InternalPipelineWrapper;
 		friend GraphicsBinder;
 		friend RaytracingBinder;
+		friend RTProgramBase;
+
+		void CreateSignature(
+			DX_Device device, 
+			D3D12_ROOT_SIGNATURE_FLAGS flags,
+			DX_RootSignature &rootSignature,
+			int &rootSignatureSize
+			);
 
 	protected:
 		InternalBindings* __InternalBindingObject;
@@ -8966,7 +8971,7 @@ namespace CA4G {
 		class Setting : public ComputeBinder::Setting {
 			friend RaytracingBinder;
 			Setting(RaytracingBinder* binder) : ComputeBinder::Setting(binder) {}
-			void AddADS(int slot, void* resource);
+			//void AddADS(int slot, void* resource);
 		public:
 			//void ADS(int slot, gObj<RTScene>& const scene) {
 			//	AddADS(slot, (void*)&scene);
@@ -8987,7 +8992,7 @@ namespace CA4G {
 			return D3D12_ROOT_SIGNATURE_FLAG_NONE;
 		}
 
-		virtual void CompleteStateObject(ID3D12RootSignature* rootSignature) = 0;
+		virtual void CompleteStateObject(DX_RootSignature rootSignature) = 0;
 
 		void OnCreate(DX_Wrapper* dxWrapper);
 
@@ -9061,7 +9066,7 @@ namespace CA4G {
 			return flags;
 		}
 
-		void CompleteStateObject(ID3D12RootSignature* rootSignature) {
+		void CompleteStateObject(DX_RootSignature rootSignature) {
 			if (HasSubobjectState<RootSignatureStateManager>())
 			{
 				((RootSignatureStateManager*)set)->SetRootSignature(rootSignature);
@@ -9162,12 +9167,11 @@ namespace CA4G {
 				});
 		}
 
-		void Globals(gObj<GraphicsBinder> binder)
+		void Bindings(gObj<GraphicsBinder> binder)
 		{
-			binder->set->RTV(0, RenderTarget);
-			
+			binder->set->BindingsOnSet();
 			binder->set->PixelShaderBindings();
-
+			binder->set->RTV(0, RenderTarget);
 			binder->set->SRV(0, Complexity);
 		}
 	};

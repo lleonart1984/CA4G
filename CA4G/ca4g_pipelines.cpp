@@ -10,6 +10,63 @@ namespace CA4G {
 	
 #pragma region Binding Methods
 
+	void ComputeBinder::CreateSignature(
+		DX_Device device,
+		D3D12_ROOT_SIGNATURE_FLAGS flags,
+		DX_RootSignature &rootSignature,
+		int &rootSignatureSize
+		)
+	{
+		auto bindings = this->__InternalBindingObject->bindings;
+
+		D3D12_ROOT_PARAMETER* parameters = new D3D12_ROOT_PARAMETER[bindings.size()];
+		
+		rootSignatureSize = 0;
+		for (int i = 0; i < bindings.size(); i++)
+		{
+			parameters[i] = bindings[i].Root_Parameter;
+			
+			switch (bindings[i].Root_Parameter.ParameterType) {
+			case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+				rootSignatureSize += bindings[i].Root_Parameter.Constants.Num32BitValues * 4;
+				break;
+			default:
+				rootSignatureSize += 4 * 4;
+				break;
+			}
+		}
+
+		D3D12_ROOT_SIGNATURE_DESC desc;
+		desc.pParameters = parameters;
+		desc.NumParameters = bindings.size();
+		desc.pStaticSamplers = __InternalBindingObject->Static_Samplers;
+		desc.NumStaticSamplers = __InternalBindingObject->StaticSamplerMax;
+		desc.Flags = flags;
+
+		ID3DBlob* signatureBlob;
+		ID3DBlob* signatureErrorBlob;
+
+		D3D12_VERSIONED_ROOT_SIGNATURE_DESC d = {};
+		d.Desc_1_0 = desc;
+		d.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
+
+		auto hr = D3D12SerializeVersionedRootSignature(&d, &signatureBlob, &signatureErrorBlob);
+
+		if (hr != S_OK)
+		{
+			throw CA4GException::FromError(CA4G_Errors_BadSignatureConstruction, "Error serializing root signature");
+		}
+
+		hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+
+		if (hr != S_OK)
+		{
+			throw CA4GException::FromError(CA4G_Errors_BadSignatureConstruction, "Error creating root signature");
+		}
+
+		delete[] parameters;
+	}
+
 	ComputeBinder::ComputeBinder() :set(new Setting(this)) {
 		__InternalBindingObject = new InternalBindings();
 		__InternalBindingObject->EngineType = Engine::Compute;
@@ -138,7 +195,12 @@ namespace CA4G {
 		InternalBindings* bindings = wrapper->binder->__InternalBindingObject;
 
 		// Create the root signature for both groups together
-		wrapper->BuildRootSignature(getRootFlags());
+		wrapper->binder->CreateSignature(
+			dxwrapper->device,
+			getRootFlags(),
+			wrapper->rootSignature,
+			wrapper->rootSignatureSize
+		);
 
 		// Create the pipeline state object
 		#pragma region Create Pipeline State Object

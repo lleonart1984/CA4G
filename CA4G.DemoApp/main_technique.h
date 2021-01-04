@@ -7,8 +7,8 @@ using namespace CA4G;
 
 //typedef class AsyncSample main_technique;
 //typedef class TriangleSample main_technique;
-typedef class SceneSample main_technique;
-//typedef class UAVSample main_technique;
+//typedef class SceneSample main_technique;
+typedef class UAVSample main_technique;
 
 #pragma region Async Sample
 
@@ -389,22 +389,21 @@ public:
 			__set InputLayout(SceneVertex::Layout());
 		}
 
-		void Globals(gObj<GraphicsBinder> binder) {
-			binder _set VertexShaderBindings();
+		void Bindings(gObj<GraphicsBinder> binder) {
+			binder _set BindingsOnSet(); {
+				binder _set PixelShaderBindings();
+				binder _set UAV(0, CountingBuffer);
 
-			binder _set SRV(0, InstanceTransforms);
-			binder _set SRV(1, GeometryTransforms);
-			binder _set CBV(0, Camera);
+				binder _set VertexShaderBindings();
+				binder _set SRV(0, InstanceTransforms);
+				binder _set SRV(1, GeometryTransforms);
+				binder _set CBV(0, Camera);
+			}
 
-			binder _set PixelShaderBindings();
-
-			binder _set UAV(0, CountingBuffer);
-		}
-
-		void Locals(gObj<GraphicsBinder> binder) {
-			binder _set VertexShaderBindings();
-
-			binder _set CBV(1, ObjectInfo);
+			binder _set BindingsOnDispatch(); {
+				binder _set VertexShaderBindings();
+				binder _set CBV(1, ObjectInfo);
+			}
 		}
 	};
 	gObj<Pipeline> pipeline;
