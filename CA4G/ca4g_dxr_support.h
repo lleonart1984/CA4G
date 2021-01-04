@@ -17,6 +17,7 @@ namespace CA4G {
 	class ProgramHandle {
 		friend RaytracingPipelineBindings;
 		friend RTProgramBase;
+		friend DX_RTProgram;
 
 		LPCWSTR shaderHandle;
 		void* cachedShaderIdentifier = nullptr;
@@ -114,11 +115,14 @@ namespace CA4G {
 
 #pragma endregion
 
+	static gObj<Buffer> ShaderTable(DX_Wrapper* dxWrapper, int stride, int count = 1);
+
 	// Represents a raytracing program.
 	// Internally represents a set of bindings for programs
 	// and shader tables to represent accessible programs during tracing.
 	class RTProgramBase {
 		friend RaytracingPipelineBindings;
+		friend RaytracingManager;
 
 		DX_RTProgram* wrapper;
 
@@ -126,6 +130,11 @@ namespace CA4G {
 		void OnLoad(DX_Wrapper* dxWrapper);
 
 	protected:
+		RTProgramBase() :
+			set(new Settings(this)),
+			load(new Loading(this)) {
+		}
+		
 		virtual void Setup() = 0;
 
 		// Collects global bindings for all programs.
@@ -145,6 +154,9 @@ namespace CA4G {
 		}
 
 	public:
+
+		virtual ~RTProgramBase() {}
+
 		class Settings {
 			friend RTProgramBase;
 			RTProgramBase* manager;
@@ -176,10 +188,15 @@ namespace CA4G {
 		friend RaytracingPipelineBindings;
 
 		gObj<C> __Pipeline;
+		void BindContext(RaytracingPipelineBindings* bindings) {
+			__Pipeline = dynamic_cast<C*>(bindings);
+			if (__Pipeline.isNull())
+				throw CA4GException("Error loading program. Program should use this type as context type.");
+		}
 	protected:
 		RTProgram() {}
 	public:
-		inline const gObj<C>& Context() {
+		inline gObj<C>& Context() {
 			return __Pipeline;
 		}
 	};
@@ -313,6 +330,7 @@ namespace CA4G {
 	{
 		friend RaytracingManager;
 		friend Loading;
+		friend Creating;
 	private:
 
 		RTPipelineWrapper* wrapper;
@@ -351,7 +369,7 @@ namespace CA4G {
 			template<typename P>
 			void Program(gObj<P>& program) {
 				program = new P();
-				program->__Pipeline = manager;
+				program->BindContext(manager);
 				manager->LoadProgram(program);
 			}
 		}* const load;

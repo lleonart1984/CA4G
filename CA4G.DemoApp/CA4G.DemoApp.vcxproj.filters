@@ -112,5 +112,6 @@
     <FxCompile Include="Shaders\Samples\Basic_VS.hlsl" />
     <FxCompile Include="Shaders\Samples\Basic_PS.hlsl" />
     <FxCompile Include="Shaders\Samples\Counting_PS.hlsl" />
+    <FxCompile Include="Shaders\Samples\RTXSample_RT.hlsl" />
   </ItemGroup>
 </Project>

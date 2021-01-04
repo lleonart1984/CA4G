@@ -30,7 +30,9 @@ namespace CA4G {
 		friend GPUScheduler;
 		friend CopyManager;
 		friend GraphicsManager;
+		friend RaytracingManager;
 		friend StaticPipelineBindingsBase;
+		friend RaytracingPipelineBindings;
 	protected:
 		DX_CmdWrapper* __InternalDXCmdWrapper;
 	};
@@ -137,7 +139,9 @@ namespace CA4G {
 	public:
 
 		// Tool method generic to create DX12 resources
-		gObj<ResourceView> CustomDXResource(int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
+		static gObj<ResourceView> CustomDXResource(
+			DX_Wrapper* dxWrapper,
+			int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
 			D3D12_CLEAR_VALUE* clearing = nullptr, CPUAccessibility cpuAccessibility = CPUAccessibility::None, bool isConstantBuffer = false);
 
 		// Creates a technique of specific type and passing some arguments to the constructor.

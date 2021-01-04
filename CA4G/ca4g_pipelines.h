@@ -8782,6 +8782,8 @@ namespace CA4G {
 		friend GraphicsBinder;
 		friend RaytracingBinder;
 		friend RTProgramBase;
+		friend RaytracingManager;
+		friend class DX_RTProgram;
 
 		void CreateSignature(
 			DX_Device device, 
@@ -8917,6 +8919,8 @@ namespace CA4G {
 				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&textures, &count);
 			}
 		} * const set;
+
+		bool HasSomeBindings();
 	};
 
 	class GraphicsBinder : public ComputeBinder {

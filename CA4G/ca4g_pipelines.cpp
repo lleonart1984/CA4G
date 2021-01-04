@@ -80,6 +80,12 @@ namespace CA4G {
 		__InternalBindingObject->EngineType = Engine::Raytracing;
 	}
 
+	bool CA4G::ComputeBinder::HasSomeBindings() {
+		return 
+			__InternalBindingObject->bindings.size() > 0 ||
+			__InternalBindingObject->StaticSamplerMax > 0;
+	}
+
 	void CA4G::ComputeBinder::Setting::AddConstant(int slot, void* data, int size)
 	{
 		D3D12_ROOT_PARAMETER p = { };

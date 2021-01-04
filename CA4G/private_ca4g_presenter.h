@@ -748,8 +748,11 @@ namespace CA4G {
 	};
 	
 	struct DX_CmdWrapper {
+		DX_Wrapper* dxWrapper;
+		DX_FallbackCommandList fallbackCmdList;
 		DX_CommandList cmdList = nullptr;
 		gObj<IPipelineBindings> currentPipeline = nullptr;
+		gObj<RTProgramBase> activeProgram = nullptr;
 		list<D3D12_CPU_DESCRIPTOR_HANDLE> srcDescriptors = {};
 		list<D3D12_CPU_DESCRIPTOR_HANDLE> dstDescriptors = {};
 		list<unsigned int> dstDescriptorRangeLengths = {};
@@ -982,7 +985,10 @@ namespace CA4G {
 					}
 
 					DX_CmdWrapper* cmdWrapper = new DX_CmdWrapper();
+					cmdWrapper->dxWrapper = this->dxWrapper;
 					cmdWrapper->cmdList = info.threadInfos[j].cmdList;
+					if (Engine::Raytracing == (Engine)i && this->dxWrapper->fallbackDevice != nullptr)
+						dxWrapper->fallbackDevice->QueryRaytracingCommandList(cmdWrapper->cmdList, IID_PPV_ARGS(&cmdWrapper->fallbackCmdList));
 					info.threadInfos[j].manager->__InternalDXCmdWrapper = cmdWrapper;
 				}
 			}

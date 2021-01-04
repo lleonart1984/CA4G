@@ -287,6 +287,7 @@ namespace CA4G {
 		friend CommandListManager;
 		friend CopyManager;
 		friend GraphicsManager;
+		friend RaytracingManager;
 		friend DX_Wrapper;
 		friend GPUScheduler;
 

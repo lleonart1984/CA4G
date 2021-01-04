@@ -60,6 +60,13 @@ namespace CA4G {
 	class ComputeBinder;
 	class GraphicsBinder;
 	class RaytracingBinder;
+	class ProgramHandle;
+	class RayGenerationHandle;
+	class MissHandle;
+	class AnyHitHandle;
+	class ClosestHitHandle;
+	class IntersectionHandle;
+	class HitGroupHandle;
 
 	template<typename L> class RTProgram;
 

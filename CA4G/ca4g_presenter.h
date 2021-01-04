@@ -253,29 +253,41 @@ namespace CA4G {
 	class RaytracingManager : public GraphicsManager {
 		friend GPUScheduler;
 	protected:
-		RaytracingManager() : GraphicsManager()
-			//, set(new Setter(this)) 
+		RaytracingManager() : GraphicsManager(), 
+			set(new Setter(this)) ,
+			dispatch(new Dispatcher(this))
 		{
 		}
 	public:
-		//class Setter {
-		//	ICmdManager* wrapper;
-		//public:
-		//	Setter(ICmdManager* wrapper) :wrapper(wrapper) {
-		//	}
-		//	void Pipeline(gObj<IPipelineBindings> bindings);
+		class Setter {
+			ICmdManager* wrapper;
+		public:
+			Setter(ICmdManager* wrapper) :wrapper(wrapper) {
+			}
+			// Sets the pipeline bindings object on the GPU.
+			void Pipeline(gObj<RaytracingPipelineBindings> bindings);
 
-		//	void Program(gObj<IRTProgram> program);
+			// Activate this program to be used when dispatching rays.
+			void Program(gObj<RTProgramBase> program);
 
-		//	// Commit all local bindings for this ray generation shader
-		//	void RayGeneration(gObj<RayGenerationHandle> program);
+			// Commit all local bindings for this ray generation shader
+			void RayGeneration(gObj<RayGenerationHandle> shader);
 
-		//	void Miss(gObj<MissHandle> program, int index);
+			// Commit all local bindings for this miss shader
+			void Miss(gObj<MissHandle> shader, int index);
 
-		//	void HitGroup(gObj<HitGroupHandle> group, int geometryIndex,
-		//		int rayContribution = 0, int multiplier = 1, int instanceContribution = 0);
-		//}* const set;
+			// Commit all local bindings for this shader group
+			void HitGroup(gObj<HitGroupHandle> group, int geometryIndex,
+				int rayContribution = 0, int multiplier = 1, int instanceContribution = 0);
+		}* const set;
 
+		class Dispatcher {
+			friend RaytracingManager;
+			RaytracingManager* manager;
+			Dispatcher(RaytracingManager* manager) :manager(manager) {}
+		public:
+			void Rays(int width, int height, int depth = 1);
+		}* const dispatch;
 	};
 
 	/// Base type for any graphic process that populates a command list.

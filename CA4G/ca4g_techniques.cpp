@@ -7,13 +7,14 @@ namespace CA4G {
 	Technique::Technique() :set(new Setting(this)), create(new Creating(this)), dispatch(new Dispatcher(this)), load(new Loading(this)) {}
 
 	gObj<ResourceView> Creating::CustomDXResource(
+		DX_Wrapper* dxWrapper,
 		int elementWidth, const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES initialState,
 		D3D12_CLEAR_VALUE* clearing, CPUAccessibility cpuAccessibility, bool isConstantBuffer)
 	{
 		if (elementWidth == 0)
 			elementWidth = DX_ResourceWrapper::SizeOfFormatElement(desc.Format);
 
-		DX_Wrapper* w = manager->__InternalDXWrapper;
+		DX_Wrapper* w = dxWrapper;
 		auto device = w->device;
 
 		D3D12_HEAP_PROPERTIES heapProp;
@@ -52,7 +53,7 @@ namespace CA4G {
 			throw CA4GException::FromError(CA4G_Errors_RunOutOfMemory, nullptr, _hr);
 		}
 
-		DX_ResourceWrapper* rwrapper = new DX_ResourceWrapper(manager->__InternalDXWrapper, resource, desc, initialState, cpuAccessibility);
+		DX_ResourceWrapper* rwrapper = new DX_ResourceWrapper(dxWrapper, resource, desc, initialState, cpuAccessibility);
 		rwrapper->elementStride = rwrapper->desc.Format == DXGI_FORMAT_UNKNOWN ? elementWidth : rwrapper->SizeOfFormatElement(rwrapper->desc.Format);
 		switch (desc.Dimension) {
 		case D3D12_RESOURCE_DIMENSION_BUFFER:
@@ -83,28 +84,28 @@ namespace CA4G {
 	gObj<Buffer> Creating::Buffer_CB(int elementStride, bool dynamic) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, (elementStride + 255) & (~255));
-		return CustomDXResource(elementStride, desc, dynamic ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COPY_DEST, nullptr, dynamic ? CPUAccessibility::Write : CPUAccessibility::None, true).Dynamic_Cast<Buffer>();
+		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, dynamic ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COPY_DEST, nullptr, dynamic ? CPUAccessibility::Write : CPUAccessibility::None, true).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_ADS(int elementStride, int count) {
 		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Buffer>();
+		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_SRV(int elementStride, int count) {
 		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count);
-		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
+		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_VB(int elementStride, int count) {
 		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count);
-		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
+		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_IB(int elementStride, int count)
@@ -112,14 +113,14 @@ namespace CA4G {
 		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count);
-		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
+		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_UAV(int elementStride, int count) {
 		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(elementStride, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Buffer>();
+		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	int MaxMipsFor(int dimension) {
@@ -150,13 +151,13 @@ namespace CA4G {
 	gObj<Texture1D> Creating::Texture1D_SRV(DXGI_FORMAT format, int width, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture1DDescription(format, desc, width, mips, arrayLength);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Texture1D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Texture1D>();
 	}
 
 	gObj<Texture1D> Creating::Texture1D_UAV(DXGI_FORMAT format, int width, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture1DDescription(format, desc, width, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Texture1D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Texture1D>();
 	}
 
 	void FillTexture2DDescription(DXGI_FORMAT format, D3D12_RESOURCE_DESC& desc, long width, int height, int mips, int arrayLength, D3D12_RESOURCE_FLAGS flag = D3D12_RESOURCE_FLAG_NONE) {
@@ -179,7 +180,7 @@ namespace CA4G {
 	gObj<Texture2D> Creating::Texture2D_SRV(DXGI_FORMAT format, int width, int height, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture2DDescription(format, desc, width, height, mips, arrayLength);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Texture2D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Texture2D>();
 	}
 
 	gObj<Texture2D> Creating::Texture2D_SRV(string filePath)
@@ -196,13 +197,13 @@ namespace CA4G {
 	gObj<Texture2D> Creating::Texture2D_UAV(DXGI_FORMAT format, int width, int height, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture2DDescription(format, desc, width, height, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Texture2D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Texture2D>();
 	}
 
 	gObj<Texture2D> Creating::Texture2D_RT(DXGI_FORMAT format, int width, int height, int mips, int arrayLength) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture2DDescription(format, desc, width, height, mips, arrayLength, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr).Dynamic_Cast<Texture2D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr).Dynamic_Cast<Texture2D>();
 	}
 
 	gObj<Texture2D> Creating::Texture2D_DSV(int width, int height, DXGI_FORMAT format) {
@@ -214,7 +215,7 @@ namespace CA4G {
 			0
 		};
 		clearing.Format = format;
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearing).Dynamic_Cast<Texture2D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearing).Dynamic_Cast<Texture2D>();
 	}
 
 	void FillTexture3DDescription(DXGI_FORMAT format, D3D12_RESOURCE_DESC& desc, long width, int height, int slices, int mips, D3D12_RESOURCE_FLAGS flag = D3D12_RESOURCE_FLAG_NONE) {
@@ -236,13 +237,13 @@ namespace CA4G {
 	gObj<Texture3D> Creating::Texture3D_SRV(DXGI_FORMAT format, int width, int height, int depth, int mips) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture3DDescription(format, desc, width, height, depth, mips);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Texture3D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr).Dynamic_Cast<Texture3D>();
 	}
 
 	gObj<Texture3D> Creating::Texture3D_UAV(DXGI_FORMAT format, int width, int height, int depth, int mips) {
 		D3D12_RESOURCE_DESC desc = { };
 		FillTexture3DDescription(format, desc, width, height, depth, mips, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(0, desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr).Dynamic_Cast<Texture3D>();
+		return CustomDXResource(manager->__InternalDXWrapper, 0, desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr).Dynamic_Cast<Texture3D>();
 	}
 
 	gObj<Texture2D> IDXDeviceManager::GetRenderTarget() {

@@ -1,12 +1,20 @@
 #include "ca4g_dxr_support.h"
 #include "private_ca4g_definitions.h"
 #include "private_ca4g_presenter.h"
+#include "private_ca4g_pipelines.h"
 
 namespace CA4G {
 
 	struct DX_LibraryWrapper {
 		D3D12_SHADER_BYTECODE bytecode;
 		list<D3D12_EXPORT_DESC> exports;
+	};
+
+	struct DX_ShaderTable {
+		DX_Resource Buffer;
+		void* MappedData;
+		int ShaderIDSize;
+		int ShaderRecordSize;
 	};
 
 	// Intenal representation of a program.
@@ -34,11 +42,11 @@ namespace CA4G {
 		list<gObj<ProgramHandle>> loadedShaderPrograms;
 
 		// Shader table for ray generation shader
-		gObj<Buffer> raygen_shaderTable;
+		DX_ShaderTable raygen_shaderTable;
 		// Shader table for all miss shaders
-		gObj<Buffer> miss_shaderTable;
+		DX_ShaderTable miss_shaderTable;
 		// Shader table for all hitgroup entries
-		gObj<Buffer> group_shaderTable;
+		DX_ShaderTable group_shaderTable;
 		// Gets the attribute size in bytes for this program (normally 2 floats)
 		int AttributesSize = 2 * 4;
 		// Gets the ray payload size in bytes for this program (normally 3 floats)
@@ -52,10 +60,65 @@ namespace CA4G {
 		// single dispatch rays
 		int MaxMiss = 10;
 
-		ID3D12RootSignature* globalSignature;
-		ID3D12RootSignature* rayGen_Signature;
-		ID3D12RootSignature* miss_Signature;
-		ID3D12RootSignature* hitGroup_Signature;
+		DX_RootSignature globalSignature = nullptr;
+		DX_RootSignature rayGen_Signature = nullptr;
+		DX_RootSignature miss_Signature = nullptr;
+		DX_RootSignature hitGroup_Signature = nullptr;
+
+		int globalSignatureSize = 0;
+		int rayGen_SignatureSize = 0;
+		int miss_SignatureSize = 0;
+		int hitGroup_SignatureSize = 0;
+
+		void BindLocalsOnShaderTable(gObj<RaytracingBinder> binder, byte* shaderRecordData) {
+			
+			list<SlotBinding> bindings = binder->__InternalBindingObject->bindings;
+			
+			for (int i = 0; i < bindings.size(); i++)
+			{
+				auto binding = bindings[i];
+
+				switch (binding.Root_Parameter.ParameterType)
+				{
+				case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+					memcpy(shaderRecordData, binding.ConstantData.ptrToConstant, binding.Root_Parameter.Constants.Num32BitValues * 4);
+					shaderRecordData += binding.Root_Parameter.Constants.Num32BitValues * 4;
+					break;
+				default:
+					shaderRecordData += 4 * 4;
+				}
+			}
+		}
+
+		void BindLocal(
+			DX_Wrapper* dxWrapper, 
+			DX_ShaderTable &shadertable, 
+			gObj<ProgramHandle> shader, 
+			int index, 
+			gObj<RaytracingBinder> binder)
+		{
+			byte* shaderRecordStart = (byte*)shadertable.MappedData + shadertable.ShaderRecordSize * index;
+			memcpy(shaderRecordStart, shader->cachedShaderIdentifier, shadertable.ShaderIDSize);
+			if (binder->HasSomeBindings())
+				BindLocalsOnShaderTable(miss_locals, shaderRecordStart + shadertable.ShaderIDSize);
+		}
+		void BindLocal(DX_Wrapper* dxWrapper, gObj<RayGenerationHandle> shader) {
+			BindLocal(dxWrapper,
+				raygen_shaderTable,
+				shader, 0, raygen_locals);
+		}
+
+		void BindLocal(DX_Wrapper* dxWrapper, gObj<MissHandle> shader, int index) {
+			BindLocal(dxWrapper, 
+				miss_shaderTable,
+				shader, index, miss_locals);
+		}
+
+		void BindLocal(DX_Wrapper* dxWrapper, gObj<HitGroupHandle> shader, int index) {
+			BindLocal(dxWrapper,
+				group_shaderTable, 
+				shader, index, hitGroup_locals);
+		}
 	};
 
 	struct RTPipelineWrapper {
@@ -76,9 +139,8 @@ namespace CA4G {
 
 	void RaytracingPipelineBindings::AppendCode(const D3D12_SHADER_BYTECODE &code)
 	{
-		DX_LibraryWrapper lib;
+		DX_LibraryWrapper lib = { };
 		lib.bytecode = code;
-		lib.exports = {};
 		wrapper->libraries.add(lib);
 	}
 
@@ -333,29 +395,100 @@ namespace CA4G {
 		}
 	}
 
-
-
-
-
 	#pragma region Program Implementation
+
+	// Creates a shader table buffer
+	DX_ShaderTable ShaderTable(DX_Wrapper* dxWrapper, int idSize, int stride, int count) {
+
+		DX_ShaderTable result = { };
+
+		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_GENERIC_READ;
+
+		stride = (stride + (D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT - 1)) & ~(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT - 1);
+
+		D3D12_RESOURCE_DESC desc = { };
+		desc.Width = count * stride;
+		desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		desc.Format = DXGI_FORMAT_UNKNOWN;
+		desc.Height = 1;
+		desc.Alignment = 0;
+		desc.DepthOrArraySize = 1;
+		desc.MipLevels = 1;
+		desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		desc.SampleDesc = { 1, 0 };
+
+		D3D12_HEAP_PROPERTIES uploadProp = {};
+		uploadProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+		uploadProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+		uploadProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+		uploadProp.VisibleNodeMask = 1;
+		uploadProp.CreationNodeMask = 1;
+
+		dxWrapper->device->CreateCommittedResource(&uploadProp,
+			D3D12_HEAP_FLAG_NONE,
+			&desc,
+			state,
+			nullptr,
+			IID_PPV_ARGS(&result.Buffer));
+
+		D3D12_RANGE read = {};
+		result.Buffer->Map(0, &read, &result.MappedData);
+		result.ShaderRecordSize = stride;
+		result.ShaderIDSize = idSize;
+		return result;
+	}
 
 	void RTProgramBase::OnLoad(DX_Wrapper* dxWrapper)
 	{
 		wrapper = new DX_RTProgram();
-		// load shaders and setup program settings
-		Setup();
-
 		wrapper->globals = new RaytracingBinder();
 		wrapper->raygen_locals = new RaytracingBinder();
 		wrapper->miss_locals = new RaytracingBinder();
 		wrapper->hitGroup_locals = new RaytracingBinder();
+
+		// load shaders and setup program settings
+		Setup();
+
 		Bindings(this->wrapper->globals);
 		RayGeneration_Bindings(this->wrapper->raygen_locals);
 		Miss_Bindings(this->wrapper->miss_locals);
 		HitGroup_Bindings(this->wrapper->hitGroup_locals);
 
 		// Create signatures
+		wrapper->globals->CreateSignature(
+			dxWrapper->device,
+			D3D12_ROOT_SIGNATURE_FLAG_NONE,
+			wrapper->globalSignature, wrapper->globalSignatureSize);
 
+		if (wrapper->raygen_locals->HasSomeBindings())
+			wrapper->raygen_locals->CreateSignature(
+				dxWrapper->device,
+				D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
+				wrapper->rayGen_Signature, wrapper->rayGen_SignatureSize);
+
+		if (wrapper->miss_locals->HasSomeBindings())
+			wrapper->miss_locals->CreateSignature(
+				dxWrapper->device,
+				D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
+				wrapper->miss_Signature, wrapper->miss_SignatureSize);
+
+		if (wrapper->hitGroup_locals->HasSomeBindings())
+			wrapper->hitGroup_locals->CreateSignature(
+				dxWrapper->device,
+				D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
+				wrapper->hitGroup_Signature, wrapper->hitGroup_SignatureSize);
+
+		// Create Shader Tables
+		UINT shaderIdentifierSize;
+		if (dxWrapper->fallbackDevice != nullptr)
+			shaderIdentifierSize = dxWrapper->fallbackDevice->GetShaderIdentifierSize();
+		else // DirectX Raytracing
+			shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+		wrapper->raygen_shaderTable = ShaderTable(dxWrapper, shaderIdentifierSize, shaderIdentifierSize + wrapper->rayGen_SignatureSize, 1);
+		wrapper->miss_shaderTable = ShaderTable(dxWrapper, shaderIdentifierSize, shaderIdentifierSize + wrapper->miss_SignatureSize, wrapper->MaxMiss);
+		wrapper->group_shaderTable = ShaderTable(dxWrapper, shaderIdentifierSize, shaderIdentifierSize + wrapper->hitGroup_SignatureSize, wrapper->MaxGroups);
 	}
 
 	#pragma endregion
@@ -363,9 +496,109 @@ namespace CA4G {
 	#pragma region Raytracing Pipeline Implementation
 	
 	void CA4G::RaytracingPipelineBindings::OnSet(ICmdManager* cmdWrapper) {
+		// Set the pipeline state object into the cmdList
+		RTPipelineWrapper* wrapper = this->wrapper;
+
+		ID3D12DescriptorHeap* heaps[] = {
+			wrapper->dxWrapper->gpu_csu->getInnerHeap(),
+			wrapper->dxWrapper->gpu_smp->getInnerHeap()
+		};
+
+		if (wrapper->dxWrapper->fallbackDevice)
+			cmdWrapper->__InternalDXCmdWrapper->fallbackCmdList->SetDescriptorHeaps(2, heaps);
+		else
+			cmdWrapper->__InternalDXCmdWrapper->cmdList->SetDescriptorHeaps(2, heaps);
 	}
 
 	void CA4G::RaytracingPipelineBindings::OnDispatch(ICmdManager* cmdWrapper) {
+	}
+
+	#pragma endregion
+
+	#pragma region RaytracingManager implementation
+
+	void RaytracingManager::Setter::Pipeline(gObj<RaytracingPipelineBindings> pipeline) {
+		DX_CmdWrapper* cmdWrapper = this->wrapper->__InternalDXCmdWrapper;
+		cmdWrapper->currentPipeline = pipeline;
+
+		if (this->wrapper->__InternalDXCmdWrapper->fallbackCmdList != nullptr)
+			this->wrapper->__InternalDXCmdWrapper->fallbackCmdList->SetPipelineState1(pipeline->wrapper->fallbackStateObject);
+		else
+			this->wrapper->__InternalDXCmdWrapper->cmdList->SetPipelineState1(pipeline->wrapper->stateObject);
+
+		pipeline->OnSet(this->wrapper);
+	}
+
+	void RaytracingManager::Setter::Program(gObj<RTProgramBase> program) {
+		wrapper->__InternalDXCmdWrapper->activeProgram = program;
+		wrapper->__InternalDXCmdWrapper->cmdList->SetComputeRootSignature(program->wrapper->globalSignature);
+		program->wrapper->globals->__InternalBindingObject->BindToGPU(
+			true,
+			this->wrapper->__InternalDXCmdWrapper->dxWrapper,
+			this->wrapper->__InternalDXCmdWrapper
+		);
+	}
+
+	void CA4G::RaytracingManager::Setter::RayGeneration(gObj<RayGenerationHandle> shader) {
+		this->wrapper->__InternalDXCmdWrapper->activeProgram->wrapper->
+			BindLocal(this->wrapper->__InternalDXCmdWrapper->dxWrapper, shader);
+	}
+	void CA4G::RaytracingManager::Setter::Miss(gObj<MissHandle> shader, int index) {
+		this->wrapper->__InternalDXCmdWrapper->activeProgram->wrapper->
+			BindLocal(this->wrapper->__InternalDXCmdWrapper->dxWrapper, shader, index);
+	}
+	void CA4G::RaytracingManager::Setter::HitGroup(gObj<HitGroupHandle> shader, int geometryIndex,
+		int rayContribution, int multiplier, int instanceContribution) {
+		int index = rayContribution + (geometryIndex * multiplier) + instanceContribution;
+		this->wrapper->__InternalDXCmdWrapper->activeProgram->wrapper->
+			BindLocal(this->wrapper->__InternalDXCmdWrapper->dxWrapper, shader, index);
+	}
+
+	void RaytracingManager::Dispatcher::Rays(int width, int height, int depth) {
+		auto currentBindings = manager->__InternalDXCmdWrapper->currentPipeline.Dynamic_Cast<RaytracingPipelineBindings>();
+		auto currentProgram = manager->__InternalDXCmdWrapper->activeProgram;
+
+		if (!currentBindings)
+			return; // Exception?
+
+		D3D12_DISPATCH_RAYS_DESC d;
+		auto rtRayGenShaderTable = currentProgram->wrapper->raygen_shaderTable;
+		auto rtMissShaderTable = currentProgram->wrapper->miss_shaderTable;
+		auto rtHGShaderTable = currentProgram->wrapper->group_shaderTable;
+
+		auto DispatchRays = [&](auto commandList, auto stateObject, auto* dispatchDesc)
+		{
+			dispatchDesc->HitGroupTable.StartAddress = rtHGShaderTable.Buffer->GetGPUVirtualAddress();
+			dispatchDesc->HitGroupTable.SizeInBytes = rtHGShaderTable.Buffer->GetDesc().Width;
+			dispatchDesc->HitGroupTable.StrideInBytes = rtHGShaderTable.ShaderRecordSize;
+
+			dispatchDesc->MissShaderTable.StartAddress = rtMissShaderTable.Buffer->GetGPUVirtualAddress();
+			dispatchDesc->MissShaderTable.SizeInBytes = rtMissShaderTable.Buffer->GetDesc().Width;
+			dispatchDesc->MissShaderTable.StrideInBytes = rtMissShaderTable.ShaderRecordSize;
+
+			dispatchDesc->RayGenerationShaderRecord.StartAddress = rtRayGenShaderTable.Buffer->GetGPUVirtualAddress();
+			dispatchDesc->RayGenerationShaderRecord.SizeInBytes = rtRayGenShaderTable.Buffer->GetDesc().Width;
+
+			dispatchDesc->Width = width;
+			dispatchDesc->Height = height;
+			dispatchDesc->Depth = depth;
+			commandList->DispatchRays(dispatchDesc);
+		};
+
+		D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+		if (manager->__InternalDXCmdWrapper->fallbackCmdList)
+		{
+			DispatchRays(manager->__InternalDXCmdWrapper->fallbackCmdList, currentBindings->wrapper->fallbackStateObject, &dispatchDesc);
+		}
+		else // DirectX Raytracing
+		{
+			DispatchRays(manager->__InternalDXCmdWrapper->cmdList, currentBindings->wrapper->stateObject, &dispatchDesc);
+		}
+
+		D3D12_RESOURCE_BARRIER b = { };
+		b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		b.UAV.pResource = nullptr;
+		manager->__InternalDXCmdWrapper->cmdList->ResourceBarrier(1, &b);
 	}
 
 	#pragma endregion
