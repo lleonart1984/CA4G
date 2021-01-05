@@ -263,15 +263,140 @@ namespace CA4G {
 
 	};
 
+	struct DX_BakedGeometry;
+	struct DX_BakedScene;
+	struct DX_GeometryCollectionWrapper;
+	struct DX_InstanceCollectionWrapper;
+
+	class InstanceCollection;
+
+	class BakedGeometry {
+		friend InstanceCollection;
+		friend RaytracingManager;
+
+		DX_BakedGeometry* internalObject;
+	};
+
+	class BakedScene {
+		friend RaytracingManager;
+		friend class InternalBindings;
+
+		DX_BakedScene* internalObject;
+	};
+
+	class GeometryCollection {
+		friend RaytracingManager;
+	protected:
+		DX_GeometryCollectionWrapper* wrapper = nullptr;
+		GeometryCollection() {}
+	public:
+		virtual ~GeometryCollection() {
+			delete wrapper;
+		}
+	};
+
+	class TriangleGeometryCollection : public GeometryCollection {
+		friend RaytracingManager;
+		TriangleGeometryCollection() :load(new Loading(this)), set(new Setting(this)) {}
+	public:
+		class Loading {
+			friend TriangleGeometryCollection;
+			TriangleGeometryCollection* manager;
+			Loading(TriangleGeometryCollection* manager) :manager(manager) {}
+		public:
+			void Geometry(int start, int count, int transformIndex = -1);
+		}* const load;
+
+		class Setting {
+			friend TriangleGeometryCollection;
+			TriangleGeometryCollection* manager;
+			Setting(TriangleGeometryCollection* manager) :manager(manager) {}
+			void __SetVertices(gObj<Buffer> vertices);
+			void __SetInputLayout(VertexElement* elements, int count);
+		public:
+			template<int count>
+			void Vertices(gObj<Buffer> vertices, VertexElement(&layout)[count]) {
+				__SetVertices(vertices);
+				__SetInputLayout((VertexElement*)&layout, count);
+			}
+
+			void Vertices(gObj<Buffer> vertices, std::initializer_list<VertexElement> layout) {
+				__SetVertices(vertices);
+				__SetInputLayout((VertexElement*)layout.begin(), layout.size());
+			}
+
+			void Indices(gObj<Buffer> indices);
+
+			void Transforms(gObj<Buffer> transforms);
+
+		}* const set;
+	};
+
+	class ProceduralGeometryCollection : public GeometryCollection {
+		friend RaytracingManager;
+		ProceduralGeometryCollection() :GeometryCollection(),
+		set(new Setting(this)),
+		load(new Loading(this)){}
+	public:
+		class Loading {
+			friend ProceduralGeometryCollection;
+			ProceduralGeometryCollection* manager;
+			Loading(ProceduralGeometryCollection* manager) :manager(manager) {}
+		public:
+			void Geometry(int start, int count);
+		}* const load;
+
+		class Setting {
+			friend ProceduralGeometryCollection;
+			ProceduralGeometryCollection* manager;
+			Setting(ProceduralGeometryCollection* manager) :manager(manager) {}
+		public:
+			void Boxes(gObj<Buffer> aabbs);
+		} * const set;
+	};
+
+	class InstanceCollection {
+		friend RaytracingManager;
+
+		DX_InstanceCollectionWrapper* wrapper = nullptr;
+		InstanceCollection() :load(new Loading(this)) {}
+	public:
+		class Loading {
+			friend InstanceCollection;
+			InstanceCollection* manager;
+			Loading(InstanceCollection* manager) :manager(manager) {}
+		public:
+			void Instance(gObj<BakedGeometry> geometries, UINT mask = 0xFF, int instanceContribution = 0, UINT instanceID = INTSAFE_UINT_MAX, float4x3 transform = float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
+		}* const load;
+	};
+
 	class RaytracingManager : public GraphicsManager {
 		friend GPUScheduler;
 	protected:
 		RaytracingManager() : GraphicsManager(), 
 			set(new Setter(this)) ,
-			dispatch(new Dispatcher(this))
+			dispatch(new Dispatcher(this)),
+			create(new Creating(this))
 		{
 		}
 	public:
+		class Creating {
+			friend RaytracingManager;
+			RaytracingManager* manager;
+			Creating(RaytracingManager* manager) :manager(manager) {}
+		public:
+			gObj<TriangleGeometryCollection> TriangleGeometries(gObj<BakedGeometry> forReuse = nullptr);
+			gObj<ProceduralGeometryCollection> ProceduralGeometries(gObj<BakedGeometry> forReuse = nullptr);
+			gObj<InstanceCollection> Intances(gObj<BakedScene> forReuse = nullptr);
+
+			gObj<BakedGeometry> Baked(gObj<GeometryCollection> geometries, bool allowUpdate, bool preferFastRaycasting);
+			gObj<BakedScene> Baked(gObj<InstanceCollection> instances, bool allowUpdate, bool preferFastRaycasting);
+			
+			gObj<BakedGeometry> Update(gObj<BakedGeometry> geometriesOnGPU);
+			gObj<BakedScene> Update(gObj<BakedScene> instancesOnGPU);
+
+		}* const create;
+
 		class Setter {
 			ICmdManager* wrapper;
 		public:

@@ -8312,6 +8312,11 @@ namespace CA4G {
 			Semantic(VertexElementSemantic::Custom)
 		{
 		}
+
+		constexpr DXGI_FORMAT Format() const {
+			return TYPE_VS_COMPONENTS_FORMATS[(int)Type][Components - 1];
+		}
+
 		// Creates a Dx12 description using this information.
 		D3D12_INPUT_ELEMENT_DESC createDesc(int offset, int& size) const {
 			D3D12_INPUT_ELEMENT_DESC d = {};
@@ -8975,11 +8980,8 @@ namespace CA4G {
 		class Setting : public ComputeBinder::Setting {
 			friend RaytracingBinder;
 			Setting(RaytracingBinder* binder) : ComputeBinder::Setting(binder) {}
-			//void AddADS(int slot, void* resource);
 		public:
-			//void ADS(int slot, gObj<RTScene>& const scene) {
-			//	AddADS(slot, (void*)&scene);
-			//}
+			void ADS(int slot, gObj<BakedScene>& const scene);
 		} * const set;
 	};
 

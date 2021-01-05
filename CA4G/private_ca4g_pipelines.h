@@ -5,6 +5,26 @@
 
 namespace CA4G {
 
+	struct DX_BakedGeometry {
+		DX_Resource bottomLevelAccDS;
+		DX_Resource scratchBottomLevelAccDS;
+		WRAPPED_GPU_POINTER emulatedPtr;
+		gObj<list<D3D12_RAYTRACING_GEOMETRY_DESC>> geometries;
+	};
+
+	struct DX_BakedScene {
+		DX_Resource topLevelAccDS;
+		DX_Resource scratchBuffer;
+		DX_Resource instancesBuffer;
+		void* instancesBufferMap;
+
+		gObj<list<gObj<DX_BakedGeometry>>> usedGeometries;
+		WRAPPED_GPU_POINTER topLevelAccFallbackPtr;
+
+		gObj<list<D3D12_RAYTRACING_INSTANCE_DESC>> instances;
+		gObj<list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>> fallbackInstances;
+	};
+
 	// Represents a binding of a resource (or resource array) to a shader slot.
 	struct SlotBinding {
 		// Gets or sets the root parameter bound
@@ -216,6 +236,19 @@ namespace CA4G {
 					break; // DESCRIPTOR CBV
 #pragma endregion
 				}
+				case D3D12_ROOT_PARAMETER_TYPE_SRV: // this type is used only for ADS
+				{
+					// Gets the range length (if bound an array) or 1 if single.
+					gObj<BakedScene> scene = *((gObj<BakedScene>*)binding.SceneData.ptrToScene);
+
+					if (dxwrapper->fallbackDevice)
+					{ // Used Fallback device
+						cmdWrapper->fallbackCmdList->SetTopLevelAccelerationStructure(i, scene->internalObject->topLevelAccFallbackPtr);
+					}
+					else
+						cmdList->SetComputeRootShaderResourceView(i, scene->internalObject->topLevelAccDS->GetGPUVirtualAddress());
+					break;
+				}
 				}
 			}
 		}
@@ -234,6 +267,7 @@ namespace CA4G {
 		ID3D12PipelineState* pso = nullptr;
 	};
 
+	
 }
 
 #endif

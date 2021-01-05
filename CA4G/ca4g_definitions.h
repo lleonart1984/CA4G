@@ -67,6 +67,11 @@ namespace CA4G {
 	class ClosestHitHandle;
 	class IntersectionHandle;
 	class HitGroupHandle;
+	class TriangleGeometryCollection;
+	class ProceduralGeometryCollection;
+	class VertexElement;
+	class BakedScene;
+	class BakedGeometry;
 
 	template<typename L> class RTProgram;
 

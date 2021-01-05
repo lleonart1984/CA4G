@@ -290,6 +290,8 @@ namespace CA4G {
 		friend RaytracingManager;
 		friend DX_Wrapper;
 		friend GPUScheduler;
+		friend TriangleGeometryCollection;
+		friend ProceduralGeometryCollection;
 
 	protected:
 		// Internal object used to wrap a DX resource

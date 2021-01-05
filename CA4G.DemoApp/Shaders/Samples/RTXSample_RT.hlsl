@@ -25,7 +25,7 @@ void RayGen() {
 	float3 O = viewP.xyz;
 	float3 D = normalize(viewT.xyz - viewP.xyz);
 
-	Output[raysIndex] = float4(1, 1, 0, 1);
+	Output[raysIndex] = float4(D, 1);
 }
 
 [shader("miss")]
