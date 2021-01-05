@@ -245,26 +245,29 @@ namespace CA4G {
 			if (!program->wrapper->globals.isNull())
 				count++;
 			// Local raygen root signature
-			if (!program->wrapper->raygen_locals.isNull())
+			if (program->wrapper->raygen_locals->HasSomeBindings())
 				count++;
 			// Local miss root signature
-			if (!program->wrapper->miss_locals.isNull())
+			if (program->wrapper->miss_locals->HasSomeBindings())
 				count++;
 			// Local hitgroup root signature
-			if (!program->wrapper->hitGroup_locals.isNull())
+			if (program->wrapper->hitGroup_locals->HasSomeBindings())
 				count++;
 
 			// Associations to global root signature
 			if (program->wrapper->associationsToGlobal.size() > 0)
 				count++;
 			// Associations to raygen local root signature
-			if (program->wrapper->associationsToRayGenLocals.size() > 0)
+			if (program->wrapper->raygen_locals->HasSomeBindings() 
+				&& program->wrapper->associationsToRayGenLocals.size() > 0)
 				count++;
 			// Associations to miss local root signature
-			if (program->wrapper->associationsToMissLocals.size() > 0)
+			if (program->wrapper->miss_locals->HasSomeBindings()
+				&& program->wrapper->associationsToMissLocals.size() > 0)
 				count++;
 			// Associations to hitgroup local root signature
-			if (program->wrapper->associationsToHitGroupLocals.size() > 0)
+			if (program->wrapper->hitGroup_locals->HasSomeBindings() 
+				&& program->wrapper->associationsToHitGroupLocals.size() > 0)
 				count++;
 			// 1 x each hit group
 			count += program->wrapper->hitGroups.size();
@@ -302,19 +305,19 @@ namespace CA4G {
 				SetGlobalRootSignature(index++, program->wrapper->globalSignature);
 			}
 			// Local raygen root signature
-			if (!program->wrapper->raygen_locals.isNull())
+			if (program->wrapper->raygen_locals->HasSomeBindings())
 			{
 				localRayGenRS = &dynamicStates[index];
 				SetLocalRootSignature(index++, program->wrapper->rayGen_Signature);
 			}
 			// Local miss root signature
-			if (!program->wrapper->miss_locals.isNull())
+			if (program->wrapper->miss_locals->HasSomeBindings())
 			{
 				localMissRS = &dynamicStates[index];
 				SetLocalRootSignature(index++, program->wrapper->miss_Signature);
 			}
 			// Local hitgroup root signature
-			if (!program->wrapper->hitGroup_locals.isNull())
+			if (program->wrapper->hitGroup_locals->HasSomeBindings())
 			{
 				localHitGroupRS = &dynamicStates[index];
 				SetLocalRootSignature(index++, program->wrapper->hitGroup_Signature);
@@ -338,13 +341,13 @@ namespace CA4G {
 			if (program->wrapper->associationsToGlobal.size() > 0)
 				SetExportsAssociations(index++, globalRS, program->wrapper->associationsToGlobal);
 			// Associations to raygen local root signature
-			if (!program->wrapper->raygen_locals.isNull() && program->wrapper->associationsToRayGenLocals.size() > 0)
+			if (program->wrapper->raygen_locals->HasSomeBindings() && program->wrapper->associationsToRayGenLocals.size() > 0)
 				SetExportsAssociations(index++, localRayGenRS, program->wrapper->associationsToRayGenLocals);
 			// Associations to miss local root signature
-			if (!program->wrapper->miss_locals.isNull() && program->wrapper->associationsToMissLocals.size() > 0)
+			if (program->wrapper->miss_locals->HasSomeBindings() && program->wrapper->associationsToMissLocals.size() > 0)
 				SetExportsAssociations(index++, localMissRS, program->wrapper->associationsToMissLocals);
 			// Associations to hitgroup local root signature
-			if (!program->wrapper->hitGroup_locals.isNull() && program->wrapper->associationsToHitGroupLocals.size() > 0)
+			if (program->wrapper->hitGroup_locals->HasSomeBindings() && program->wrapper->associationsToHitGroupLocals.size() > 0)
 				SetExportsAssociations(index++, localHitGroupRS, program->wrapper->associationsToHitGroupLocals);
 		}
 

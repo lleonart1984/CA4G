@@ -82,7 +82,11 @@ namespace CA4G {
 	class CopyManager : public CommandListManager {
 		friend GPUScheduler;
 	protected:
-		CopyManager():clear(new Clearing(this)), load(new Loading(this)){}
+		CopyManager() :
+			clear(new Clearing(this)),
+			load(new Loading(this)),
+			copy(new Copying(this)) {
+		}
 	public:
 		~CopyManager() {
 			delete clear;
@@ -136,6 +140,15 @@ namespace CA4G {
 			void RegionFromGPU(gObj<ResourceView> singleSubresource, const D3D12_BOX &region);
 		}
 		* const load;
+
+
+		class Copying {
+			friend CopyManager;
+			CopyManager* manager;
+			Copying(CopyManager* manager) :manager(manager) {}
+		public:
+			void Resource(gObj<Texture2D> dst, gObj<Texture2D> src);
+		}* const copy;
 	};
 
 	class ComputeManager : public CopyManager
@@ -310,7 +323,7 @@ namespace CA4G {
 	};
 	template<>
 	struct EngineType<RaytracingManager> {
-		static const Engine Type = Engine::Raytracing;
+		static const Engine Type = Engine::Direct;
 	};
 	template<>
 	struct EngineType<ComputeManager> {
@@ -393,7 +406,13 @@ namespace CA4G {
 			GPUProcess_Async(new CallableMember<T, RaytracingManager>(instance, member));
 		}
 
+		// Finish a frame in scheduler flushing all pending work.
+		// Prepares the render target to be presented.
+		// Present a back buffer in the swap chain.
 		void BackBuffer();
+
+		// Prepares the render target.
+		void RenderTarget();
 	};
 
 	struct InternalDXInfo {

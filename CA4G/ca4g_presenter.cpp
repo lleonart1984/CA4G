@@ -120,13 +120,18 @@ namespace CA4G {
 		this->presenter->internalInfo->mainCmdList = __PInternalState->scheduler->Engines[0].threadInfos[0].cmdList;
 	}
 
+	void Dispatcher::RenderTarget() {
+		DX_Wrapper* wrapper = (DX_Wrapper*)this->wrapper->__InternalDXWrapper;
+		wrapper->scheduler->PrepareRenderTarget(D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
+
 	// uses the presenter to swap buffers and present.
 	void Dispatcher::BackBuffer() {
 		DX_Wrapper* wrapper = (DX_Wrapper*)this->wrapper->__InternalDXWrapper;
 
 		// Wait for all 
 		wrapper->scheduler->FinishFrame();
-		
+
 		auto hr = wrapper->swapChain->Present(0, 0);
 
 		if (hr != S_OK) {
@@ -521,6 +526,17 @@ namespace CA4G {
 			singleSubresource->__InternalViewWrapper, region);
 	}
 
+	void CopyManager::Copying::Resource(gObj<Texture2D> dst, gObj<Texture2D> src) {
+		auto cmdWrapper = this->manager->__InternalDXCmdWrapper;
+		dst->__InternalDXWrapper->AddBarrier(cmdWrapper->cmdList,
+			D3D12_RESOURCE_STATE_COPY_DEST);
+		src->__InternalDXWrapper->AddBarrier(cmdWrapper->cmdList,
+			D3D12_RESOURCE_STATE_COPY_SOURCE);
+		cmdWrapper->cmdList->CopyResource(
+			dst->__InternalDXWrapper->resource, 
+			src->__InternalDXWrapper->resource);
+	}
+
 #pragma endregion
 
 #pragma region Graphics Manager
@@ -711,16 +727,14 @@ namespace CA4G {
 
 	Signal GPUScheduler::FlushAndSignal(EngineMask mask) {
 		int engines = (int)mask;
-		long rally[4];
+		long rally[3];
 		// Barrier to wait for all pending workers to populate command lists
 		// After this, next CPU processes can assume previous CPU collecting has finished
 		counting->Wait();
 
 		#pragma region Flush Pending Workers
 
-		int resultMask = 0;
-
-		for (int e = 0; e < 4; e++)
+		for (int e = 0; e < 3; e++)
 			if (engines & (1 << e))
 			{
 				int activeCmdLists = 0;
@@ -748,13 +762,12 @@ namespace CA4G {
 
 				if (activeCmdLists > 0) // some cmdlist to execute
 				{
-					resultMask |= 1 << e;
 					Engines[e].queue->Commit(ActiveCmdLists, activeCmdLists);
 
 					rally[e] = Engines[e].queue->Signal();
 				}
 				else
-					rally[e] = 0;
+					rally[e] = 0; 
 			}
 
 		return Signal(this, rally);
@@ -762,12 +775,12 @@ namespace CA4G {
 
 	void GPUScheduler::WaitFor(const Signal& signal) {
 		int fencesForWaiting = 0;
-		HANDLE FencesForWaiting[4];
-		for (int e = 0; e < 4; e++)
+		HANDLE FencesForWaiting[3];
+		for (int e = 0; e < 3; e++)
 			if (signal.rallyPoints[e] != 0)
 				FencesForWaiting[fencesForWaiting++] = Engines[e].queue->TriggerEvent(signal.rallyPoints[e]);
 		WaitForMultipleObjects(fencesForWaiting, FencesForWaiting, true, INFINITE);
-		if (signal.rallyPoints[0] != 0 || signal.rallyPoints[3] != 0)
+		if (signal.rallyPoints[0] != 0)
 			this->AsyncWorkPending = false;
 	}
 
@@ -776,7 +789,7 @@ namespace CA4G {
 	}
 
 	void GPUScheduler::EnqueueAsync(gObj<IGPUProcess> process) {
-		this->AsyncWorkPending |= process->RequiredEngine() == Engine::Direct || process->RequiredEngine() == Engine::Raytracing;
+		this->AsyncWorkPending |= process->RequiredEngine() == Engine::Direct;
 		counting->Increment();
 		processQueue->TryProduce(TagProcess{ process, this->Tag });
 	}

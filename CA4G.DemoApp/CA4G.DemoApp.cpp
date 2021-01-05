@@ -9,7 +9,14 @@
 
 using namespace CA4G;
 
+#define USE_GUI
+
+#ifdef USE_GUI
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+#endif
+
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 #include "ca4g_ImGuiTraits.h"
@@ -39,6 +46,7 @@ int main(int, char**)
 
 	#pragma region ImGui Initialization
 
+#ifdef USE_GUI
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -68,6 +76,8 @@ int main(int, char**)
 		guiDescriptors->GetCPUDescriptorHandleForHeapStart(),
 		guiDescriptors->GetGPUDescriptorHandleForHeapStart());
 
+#endif
+
 	#pragma endregion
 
 	auto technique = presenter _create TechniqueObj<main_technique>();
@@ -95,15 +105,18 @@ int main(int, char**)
 
 		#pragma region New Frame GUI
 
+#ifdef USE_GUI
 		// Start the Dear ImGui frame
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+#endif
 
 		#pragma endregion
 
 		#pragma region GUI Population
 		
+#ifdef USE_GUI
 		if (true)
 		{
 			ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
@@ -113,14 +126,23 @@ int main(int, char**)
 
 			ImGui::End();
 		}
+#endif
 
 		#pragma endregion
 
+#ifdef USE_GUI
 		scene->Animate(ImGui::GetTime(), ImGui::GetFrameCount());
+#endif
 
 		presenter _dispatch TechniqueObj(technique); // excutes the technique 
 		
 		#pragma region Present GUI
+#ifdef USE_GUI
+
+		// Prepares the render target to draw on it...
+		// Just in case the technique leave it in other state
+		presenter _dispatch RenderTarget();
+
 		auto renderTargetHandle = dxObjects->RenderTargets[dxObjects->swapChain->GetCurrentBackBufferIndex()];
 		dxObjects->mainCmdList->OMSetRenderTargets(1, &renderTargetHandle, false, nullptr);
 		ID3D12DescriptorHeap* dh[1] = { guiDescriptors };
@@ -128,7 +150,7 @@ int main(int, char**)
 
 		ImGui::Render();
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxObjects->mainCmdList);
-
+#endif
 		#pragma endregion
 
 		presenter _dispatch BackBuffer(); // present the current back buffer.
@@ -140,9 +162,10 @@ int main(int, char**)
 // Win32 message handler
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+#ifdef USE_GUI
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
 		return true;
-
+#endif
 	switch (msg)
 	{
 	case WM_SYSCOMMAND:

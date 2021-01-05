@@ -864,7 +864,7 @@ namespace CA4G {
 	struct GPUScheduler {
 		DX_Wrapper* dxWrapper;
 
-		PerEngineInfo Engines[4] = { }; // 0- direct, 1- compute, 2 - copy, 3- raytracing
+		PerEngineInfo Engines[3] = { }; // 0- direct, 1- compute, 2 - copy
 
 		// Struct for threading parameters
 		struct GPUWorkerInfo {
@@ -911,7 +911,7 @@ namespace CA4G {
 
 			this->processQueue = new ProducerConsumerQueue<TagProcess>(threads);
 
-			this->ActiveCmdLists = new DX_CommandList[threads * 4];
+			this->ActiveCmdLists = new DX_CommandList[threads * 3];
 
 			this->threads = new HANDLE[threads];
 			this->workers = new GPUWorkerInfo[threads];
@@ -926,14 +926,13 @@ namespace CA4G {
 					this->threads[i] = CreateThread(nullptr, 0, __WORKER_TODO, &workers[i], 0, &threadId);
 			}
 
-			for (int i = 0; i < 4; i++)
+			for (int i = 0; i < 3; i++)
 			{
 				PerEngineInfo& info = Engines[i];
 
 				D3D12_COMMAND_LIST_TYPE type;
 				switch (i) {
 				case 0: // Graphics
-				case 3: // Raytracing
 					type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 					break;
 				case 1: // Compute
@@ -944,7 +943,7 @@ namespace CA4G {
 					break;
 				}
 
-				// Create queue
+				// Create queue (REUSE queue of graphics for raytracing)
 				info.queue = new CommandQueueManager(device, type);
 
 				info.threadInfos = new PerThreadInfo[threads];
@@ -971,7 +970,7 @@ namespace CA4G {
 
 					switch ((Engine)i) {
 					case Engine::Direct:
-						info.threadInfos[j].manager = new GraphicsManager();
+						info.threadInfos[j].manager = new RaytracingManager();
 						break;
 					case Engine::Compute:
 						info.threadInfos[j].manager = new ComputeManager();
@@ -979,15 +978,12 @@ namespace CA4G {
 					case Engine::Copy:
 						info.threadInfos[j].manager = new CopyManager();
 						break;
-					case Engine::Raytracing:
-						info.threadInfos[j].manager = new RaytracingManager();
-						break;
 					}
 
 					DX_CmdWrapper* cmdWrapper = new DX_CmdWrapper();
 					cmdWrapper->dxWrapper = this->dxWrapper;
 					cmdWrapper->cmdList = info.threadInfos[j].cmdList;
-					if (Engine::Raytracing == (Engine)i && this->dxWrapper->fallbackDevice != nullptr)
+					if (this->dxWrapper->fallbackDevice != nullptr)
 						dxWrapper->fallbackDevice->QueryRaytracingCommandList(cmdWrapper->cmdList, IID_PPV_ARGS(&cmdWrapper->fallbackCmdList));
 					info.threadInfos[j].manager->__InternalDXCmdWrapper = cmdWrapper;
 				}
@@ -1025,18 +1021,24 @@ namespace CA4G {
 
 			CurrentFrameIndex = frame;
 
-			for (int e = 0; e < 4; e++)
+			for (int e = 0; e < 3; e++)
 				Engines[e].frames[frame].ResetUsedAllocators();
 
+			PrepareRenderTarget(D3D12_RESOURCE_STATE_RENDER_TARGET);
+		}
+
+		void PrepareRenderTarget(D3D12_RESOURCE_STATES state) {
+			if (!Engines[0].threadInfos[0].isActive)
+			{ // activate main cmd.
+				Engines[0].threadInfos[0].Activate(
+					Engines[0].frames[CurrentFrameIndex].allocatorSet[0]
+				);
+			}
 			// Get current RT
 			auto currentRT = this->dxWrapper->RenderTargets[this->CurrentFrameIndex];
-			DX_ResourceWrapper* rtWrapper = (DX_ResourceWrapper*) currentRT->__InternalDXWrapper;
-
-			// Activate cmd0
-			this->Engines[0].threadInfos[0].
-				Activate(this->Engines[0].frames[this->CurrentFrameIndex].RequireAllocator(0));
 			// Place a barrier at thread 0 cmdList to Present
-			rtWrapper->AddBarrier(this->Engines[0].threadInfos[0].cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			DX_ResourceWrapper* rtWrapper = (DX_ResourceWrapper*)currentRT->__InternalDXWrapper;
+			rtWrapper->AddBarrier(this->Engines[0].threadInfos[0].cmdList, state);
 		}
 
 		void FinishFrame() {
@@ -1044,12 +1046,7 @@ namespace CA4G {
 				// Ensure all async work was done before.
 				FlushAndSignal(EngineMask::All).WaitFor();
 
-			// Get current RT
-			auto currentRT = this->dxWrapper->RenderTargets[this->CurrentFrameIndex];
-
-			// Place a barrier at thread 0 cmdList to Present
-			DX_ResourceWrapper* rtWrapper = (DX_ResourceWrapper*) currentRT->__InternalDXWrapper;
-			rtWrapper->AddBarrier(this->Engines[0].threadInfos[0].cmdList, D3D12_RESOURCE_STATE_PRESENT);
+			PrepareRenderTarget(D3D12_RESOURCE_STATE_PRESENT);
 
 			perFrameFinishedSignal[CurrentFrameIndex] = FlushAndSignal(EngineMask::All);
 			if (!dxWrapper->UseFrameBuffering)

@@ -77,7 +77,7 @@ namespace CA4G {
 	}
 
 	RaytracingBinder::RaytracingBinder(): ComputeBinder(), set(new Setting(this)) {
-		__InternalBindingObject->EngineType = Engine::Raytracing;
+		__InternalBindingObject->EngineType = Engine::Compute;
 	}
 
 	bool CA4G::ComputeBinder::HasSomeBindings() {

@@ -40,13 +40,12 @@ namespace CA4G {
 	// Represents the different engines can be used to work with the GPU.
 	enum class Engine : int {
 		// Engine used to generate graphics using rasterization with vertex, hull, domain, geometry and pixel shaders.
+		// Engine also used for ray-tracing programs using libraries. (This engine uses the same queue that graphics).
 		Direct = 0,
 		// Engine used for parallel computation using compute shaders
 		Compute = 1,
 		// Engine used for copying on the GPU.
-		Copy = 2,
-		// Engine used for ray-tracing programs using libraries. (This engine uses the same queue that graphics).
-		Raytracing = 3
+		Copy = 2
 	};
 
 	class IPipelineBindings {
@@ -66,22 +65,20 @@ namespace CA4G {
 		Direct = 1,
 		Compute = 2,
 		Copy = 4,
-		Raytracing = 8,
-		All = 15
+		All = 7
 	};
 
 	struct Signal {
 		friend Dispatcher;
 		friend GPUScheduler;
 	private:
-		Signal(GPUScheduler* scheduler, long rallyPoints[4]) {
+		Signal(GPUScheduler* scheduler, long rallyPoints[3]) {
 			this->scheduler = scheduler;
 			this->rallyPoints[0] = rallyPoints[0];
 			this->rallyPoints[1] = rallyPoints[1];
 			this->rallyPoints[2] = rallyPoints[2];
-			this->rallyPoints[3] = rallyPoints[3];
 		}
-		long rallyPoints[4] = { };
+		long rallyPoints[3] = { };
 		GPUScheduler* scheduler = nullptr;
 	public:
 		Signal() {}

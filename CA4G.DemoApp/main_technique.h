@@ -7,9 +7,9 @@ using namespace CA4G;
 
 //typedef class AsyncSample main_technique;
 //typedef class TriangleSample main_technique;
-//typedef class SceneSample main_technique;
+typedef class SceneSample main_technique;
 //typedef class UAVSample main_technique;
-typedef class BasicRaycastSample main_technique;
+//typedef class BasicRaycastSample main_technique;
 
 
 #pragma region Async Sample
@@ -603,7 +603,7 @@ public:
 		Transforms = __create Buffer_CB<TransformsCB>();
 		GeometryTransforms = __create Buffer_SRV<float4x3>(desc->getTransformsBuffer().Count);
 		InstanceTransforms = __create Buffer_SRV<float4x4>(desc->Instances().Count);
-		OutputImage = __create Texture2D_UAV<float4>(render_target->Width, render_target->Height, 1, 1);
+		OutputImage = __create Texture2D_UAV<RGBA>(render_target->Width, render_target->Height, 1, 1);
 
 		pipeline = __create Pipeline<RTXSample>();
 		pipeline->Transforms = Transforms;
@@ -666,6 +666,7 @@ public:
 	}
 
 	void DrawScene(gObj<RaytracingManager> manager) {
+		
 		manager _set Pipeline(pipeline);
 		manager _set Program(pipeline->MainProgram);
 
@@ -677,6 +678,8 @@ public:
 		}
 
 		manager _dispatch Rays(render_target->Width, render_target->Height);
+
+		manager _copy Resource(render_target, OutputImage);
 	}
 };
 

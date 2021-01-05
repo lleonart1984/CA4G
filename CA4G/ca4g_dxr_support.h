@@ -319,7 +319,9 @@ namespace CA4G {
 
 #pragma endregion
 
-	struct RaytracingPipelineBindings : public virtual DynamicStateBindings,
+	struct RaytracingPipelineBindings : 
+		public IPipelineBindings,
+		public virtual DynamicStateBindings,
 		DXILManager,
 		GlobalRootSignatureManager,
 		LocalRootSignatureManager,
@@ -393,6 +395,8 @@ namespace CA4G {
 		// When implemented, configures the pipeline object loading libraries,
 		// creating shader handles and defining program settings.
 		virtual void Setup() = 0;
+
+		Engine GetEngine() { return Engine::Compute; }
 
 		RaytracingPipelineBindings() : 
 			create(new Creating(this)), 

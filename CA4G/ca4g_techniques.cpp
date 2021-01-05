@@ -247,7 +247,7 @@ namespace CA4G {
 	}
 
 	gObj<Texture2D> IDXDeviceManager::GetRenderTarget() {
-		return __InternalState->RenderTargets[__InternalState->swapChain->GetCurrentBackBufferIndex()];
+		return __InternalState->RenderTargets[__InternalState->scheduler->CurrentFrameIndex];// swapChain->GetCurrentBackBufferIndex()];
 	}
 
 	Signal Creating::FlushAndSignal(EngineMask mask) {

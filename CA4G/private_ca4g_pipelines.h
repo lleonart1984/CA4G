@@ -117,7 +117,6 @@ namespace CA4G {
 				case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
 					switch (this->EngineType) {
 					case Engine::Compute:
-					case Engine::Raytracing:
 						cmdList->SetComputeRoot32BitConstants(i, binding.Root_Parameter.Constants.Num32BitValues,
 							binding.ConstantData.ptrToConstant, 0);
 						break;
@@ -159,7 +158,6 @@ namespace CA4G {
 								switch (this->EngineType)
 								{
 								case Engine::Compute:
-								case Engine::Raytracing:
 									state |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 									break;
 								case Engine::Direct:
@@ -191,7 +189,6 @@ namespace CA4G {
 
 					switch (this->EngineType) {
 					case Engine::Compute:
-					case Engine::Raytracing:
 						cmdList->SetComputeRootDescriptorTable(i, dxwrapper->gpu_csu->getGPUVersion(startIndex));
 						break;
 					case Engine::Direct:
@@ -210,7 +207,6 @@ namespace CA4G {
 
 					switch (this->EngineType) {
 					case Engine::Compute:
-					case Engine::Raytracing:
 						cmdList->SetComputeRootConstantBufferView(i, iresource->resource->GetGPUVirtualAddress());
 						break;
 					case Engine::Direct:
