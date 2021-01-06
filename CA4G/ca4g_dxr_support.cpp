@@ -992,6 +992,7 @@ namespace CA4G {
 
 	gObj<GeometryCollection> RaytracingManager::Creating::Attach(gObj<GeometryCollection> collection) {
 		collection->wrapper->cmdList = manager->__InternalDXCmdWrapper->cmdList;
+		return collection;
 	}
 
 
