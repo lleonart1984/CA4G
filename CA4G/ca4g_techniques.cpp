@@ -91,7 +91,7 @@ namespace CA4G {
 		if (count == 0) return nullptr;
 		D3D12_RESOURCE_DESC desc = { };
 		FillBufferDescription(desc, elementStride * count, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, D3D12_RESOURCE_STATE_COMMON, nullptr).Dynamic_Cast<Buffer>();
+		return CustomDXResource(manager->__InternalDXWrapper, elementStride, desc, D3D12_RESOURCE_STATE_COMMON | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr).Dynamic_Cast<Buffer>();
 	}
 
 	gObj<Buffer> Creating::Buffer_SRV(int elementStride, int count) {

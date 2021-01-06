@@ -70,8 +70,7 @@ namespace CA4G {
 	class TriangleGeometryCollection;
 	class ProceduralGeometryCollection;
 	class VertexElement;
-	class BakedScene;
-	class BakedGeometry;
+	class InstanceCollection;
 
 	template<typename L> class RTProgram;
 

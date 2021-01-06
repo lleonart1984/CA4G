@@ -84,6 +84,11 @@ namespace CA4G {
 		resource->__InternalDXWrapper->ReadRegionFromMappedSubresource(data, resource->__InternalViewWrapper, region, flipRows);
 	}
 
+	D3D12_GPU_VIRTUAL_ADDRESS CA4G::Buffer::GPUVirtualAddress(int element)
+	{
+		return __InternalDXWrapper->resource->GetGPUVirtualAddress() + (element + __InternalViewWrapper->arrayStart) * Stride;
+	}
+
 	gObj<Buffer> Buffer::Creating::Slice(int startElement, int count) {
 		return new Buffer(
 			buffer->__InternalDXWrapper,

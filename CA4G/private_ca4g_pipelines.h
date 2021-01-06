@@ -9,21 +9,68 @@ namespace CA4G {
 		DX_Resource bottomLevelAccDS;
 		DX_Resource scratchBottomLevelAccDS;
 		WRAPPED_GPU_POINTER emulatedPtr;
-		gObj<list<D3D12_RAYTRACING_GEOMETRY_DESC>> geometries;
+		long updatingVersion;
+		long structuralVersion;
 	};
 
 	struct DX_BakedScene {
 		DX_Resource topLevelAccDS;
+		WRAPPED_GPU_POINTER topLevelAccFallbackPtr;
 		DX_Resource scratchBuffer;
 		DX_Resource instancesBuffer;
 		void* instancesBufferMap;
-
-		gObj<list<gObj<DX_BakedGeometry>>> usedGeometries;
-		WRAPPED_GPU_POINTER topLevelAccFallbackPtr;
-
-		gObj<list<D3D12_RAYTRACING_INSTANCE_DESC>> instances;
-		gObj<list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>> fallbackInstances;
+		long updatingVersion;
+		long structuralVersion;
 	};
+
+	struct DX_GeometryCollectionWrapper {
+		// GPU version of this geometry collection
+		gObj<DX_BakedGeometry> gpuVersion = nullptr;
+		// Increases if vertex data or aabbs geometry is updated.
+		long updatingVersion = 0;
+		// Increases if number of geometries or new geometry element is created or removed.
+		long structuralVersion = 0;
+
+		// The ADS was created to support fast updates.
+		// If this is false, update can be possible only through rebuilding
+		bool allowsUpdating;
+
+		gObj<list<D3D12_RAYTRACING_GEOMETRY_DESC>> geometries = new list<D3D12_RAYTRACING_GEOMETRY_DESC>();
+
+		// Triangles definitions
+		gObj<Buffer> boundVertices;
+		gObj<Buffer> boundIndices;
+		gObj<Buffer> boundTransforms;
+		int currentVertexOffset = 0;
+		DXGI_FORMAT currentVertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		// Procedural definitions
+		gObj<Buffer> aabbs;
+
+		DX_CommandList cmdList;
+	};
+
+	struct DX_InstanceCollectionWrapper {
+		// GPU version of this instance collection.
+		gObj<DX_BakedScene> gpuVersion = nullptr;
+		// Increases if some instance attribute is updated.
+		long updatingVersion = 0;
+		// Increases if number of instance is modified.
+		long structuralVersion = 0;
+
+		// The ADS was created to support fast updates.
+		// If this is false, update can be possible only through rebuilding
+		bool allowsUpdating;
+
+		// List with persistent reference to geometries used by the instances in this collection.
+		gObj<list<gObj<GeometryCollection>>> usedGeometries = new list<gObj<GeometryCollection>>();
+		// Determines if the instances are for a fallback device
+		bool FallbackDeviceUsed = false;
+		// Instances
+		gObj<list<D3D12_RAYTRACING_INSTANCE_DESC>> instances = new list<D3D12_RAYTRACING_INSTANCE_DESC>();
+		gObj<list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>> fallbackInstances = new list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>();
+	};
+
 
 	// Represents a binding of a resource (or resource array) to a shader slot.
 	struct SlotBinding {
@@ -239,14 +286,16 @@ namespace CA4G {
 				case D3D12_ROOT_PARAMETER_TYPE_SRV: // this type is used only for ADS
 				{
 					// Gets the range length (if bound an array) or 1 if single.
-					gObj<BakedScene> scene = *((gObj<BakedScene>*)binding.SceneData.ptrToScene);
+					gObj<InstanceCollection> scene = *((gObj<InstanceCollection>*)binding.SceneData.ptrToScene);
+					if (scene->State() == CollectionState::NotBuilt)
+						throw CA4GException("Scene should be loaded on the GPU first.");
 
 					if (dxwrapper->fallbackDevice)
 					{ // Used Fallback device
-						cmdWrapper->fallbackCmdList->SetTopLevelAccelerationStructure(i, scene->internalObject->topLevelAccFallbackPtr);
+						cmdWrapper->fallbackCmdList->SetTopLevelAccelerationStructure(i, scene->wrapper->gpuVersion->topLevelAccFallbackPtr);
 					}
 					else
-						cmdList->SetComputeRootShaderResourceView(i, scene->internalObject->topLevelAccDS->GetGPUVirtualAddress());
+						cmdList->SetComputeRootShaderResourceView(i, scene->wrapper->gpuVersion->topLevelAccDS->GetGPUVirtualAddress());
 					break;
 				}
 				}
@@ -266,7 +315,6 @@ namespace CA4G {
 		// Gets or sets the pipeline object built for the pipeline
 		ID3D12PipelineState* pso = nullptr;
 	};
-
 	
 }
 

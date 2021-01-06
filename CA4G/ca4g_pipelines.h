@@ -8981,7 +8981,7 @@ namespace CA4G {
 			friend RaytracingBinder;
 			Setting(RaytracingBinder* binder) : ComputeBinder::Setting(binder) {}
 		public:
-			void ADS(int slot, gObj<BakedScene>& const scene);
+			void ADS(int slot, gObj<InstanceCollection>& const scene);
 		} * const set;
 	};
 

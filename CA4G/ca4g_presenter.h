@@ -268,24 +268,22 @@ namespace CA4G {
 	struct DX_GeometryCollectionWrapper;
 	struct DX_InstanceCollectionWrapper;
 
+	enum class CollectionState {
+		// The collection has not been built yet, there is not any GPU version of it.
+		NotBuilt,
+		// The collection has been built and doesnt need any update
+		UpToDate,
+		// The collection has a GPU version but some elements might be updated.
+		NeedsUpdate,
+		// The collection has a GPU version with a different structure.
+		// Needs to be rebuilt to update dirty elements.
+		NeedsRebuilt
+	};
+
 	class InstanceCollection;
-
-	class BakedGeometry {
-		friend InstanceCollection;
-		friend RaytracingManager;
-
-		DX_BakedGeometry* internalObject;
-	};
-
-	class BakedScene {
-		friend RaytracingManager;
-		friend class InternalBindings;
-
-		DX_BakedScene* internalObject;
-	};
-
 	class GeometryCollection {
 		friend RaytracingManager;
+		friend InstanceCollection;
 	protected:
 		DX_GeometryCollectionWrapper* wrapper = nullptr;
 		GeometryCollection() {}
@@ -293,39 +291,57 @@ namespace CA4G {
 		virtual ~GeometryCollection() {
 			delete wrapper;
 		}
+
+		CollectionState State();
+
+		void ForceState(CollectionState state);
+
+		int Count();
+
+		// Clears this collection
+		void Clear();
 	};
 
 	class TriangleGeometryCollection : public GeometryCollection {
 		friend RaytracingManager;
-		TriangleGeometryCollection() :load(new Loading(this)), set(new Setting(this)) {}
+		TriangleGeometryCollection() :
+			load(new Loading(this)), 
+			set(new Setting(this)),
+		create(new Creating(this)){}
 	public:
 		class Loading {
 			friend TriangleGeometryCollection;
 			TriangleGeometryCollection* manager;
 			Loading(TriangleGeometryCollection* manager) :manager(manager) {}
 		public:
-			void Geometry(int start, int count, int transformIndex = -1);
+			void Vertices(int geometryID, gObj<Buffer> newVertices);
+
+			void Transform(int geometryID, int transformIndex);
 		}* const load;
+
+		class Creating {
+			friend TriangleGeometryCollection;
+			TriangleGeometryCollection* manager;
+			Creating(TriangleGeometryCollection* manager):manager(manager){}
+		public:
+			int Geometry(gObj<Buffer> vertices, int transformIndex = -1);
+			
+			int Geometry(gObj<Buffer> vertices, gObj<Buffer> indices, int transformIndex = -1);
+		}* const create;
 
 		class Setting {
 			friend TriangleGeometryCollection;
 			TriangleGeometryCollection* manager;
 			Setting(TriangleGeometryCollection* manager) :manager(manager) {}
-			void __SetVertices(gObj<Buffer> vertices);
 			void __SetInputLayout(VertexElement* elements, int count);
 		public:
 			template<int count>
-			void Vertices(gObj<Buffer> vertices, VertexElement(&layout)[count]) {
-				__SetVertices(vertices);
+			void VertexLayout(VertexElement(&layout)[count]) {
 				__SetInputLayout((VertexElement*)&layout, count);
 			}
-
-			void Vertices(gObj<Buffer> vertices, std::initializer_list<VertexElement> layout) {
-				__SetVertices(vertices);
+			void VertexLayout(std::initializer_list<VertexElement> layout) {
 				__SetInputLayout((VertexElement*)layout.begin(), layout.size());
 			}
-
-			void Indices(gObj<Buffer> indices);
 
 			void Transforms(gObj<Buffer> transforms);
 
@@ -335,7 +351,7 @@ namespace CA4G {
 	class ProceduralGeometryCollection : public GeometryCollection {
 		friend RaytracingManager;
 		ProceduralGeometryCollection() :GeometryCollection(),
-		set(new Setting(this)),
+		create(new Creating(this)),
 		load(new Loading(this)){}
 	public:
 		class Loading {
@@ -343,31 +359,65 @@ namespace CA4G {
 			ProceduralGeometryCollection* manager;
 			Loading(ProceduralGeometryCollection* manager) :manager(manager) {}
 		public:
-			void Geometry(int start, int count);
+			void Boxes(int start, gObj<Buffer> newBoxes);
 		}* const load;
 
-		class Setting {
+		class Creating {
 			friend ProceduralGeometryCollection;
 			ProceduralGeometryCollection* manager;
-			Setting(ProceduralGeometryCollection* manager) :manager(manager) {}
+			Creating(ProceduralGeometryCollection* manager) :manager(manager) {}
 		public:
-			void Boxes(gObj<Buffer> aabbs);
-		} * const set;
+			int Geometry(gObj<Buffer> boxes);
+		} * const create;
 	};
 
 	class InstanceCollection {
 		friend RaytracingManager;
+		friend class InternalBindings;
 
 		DX_InstanceCollectionWrapper* wrapper = nullptr;
-		InstanceCollection() :load(new Loading(this)) {}
+		InstanceCollection() :load(new Loading(this)),
+		create(new Creating(this)){}
 	public:
 		class Loading {
 			friend InstanceCollection;
 			InstanceCollection* manager;
 			Loading(InstanceCollection* manager) :manager(manager) {}
 		public:
-			void Instance(gObj<BakedGeometry> geometries, UINT mask = 0xFF, int instanceContribution = 0, UINT instanceID = INTSAFE_UINT_MAX, float4x3 transform = float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
+			// Updates the geometry attribute for a specific instance
+			void InstanceGeometry(int instance, gObj<GeometryCollection> geometries);
+			// Updates the mask attribute for a specific instance
+			void InstanceMask(int instance, UINT mask);
+			// Updates the contribution attribute for a specific instance
+			void InstanceContribution(int instance, int instanceContribution);
+			// Updates the instance ID attribute for a specific instance
+			void InstanceID(int instance, UINT instanceID);
+			// Updates the transform attribute for a specific instance
+			void InstanceTransform(int instance, float4x3 transform);
 		}* const load;
+
+		class Creating {
+			friend InstanceCollection;
+			InstanceCollection* manager;
+			Creating(InstanceCollection* manager) :manager(manager) {}
+		public:
+			// Adds a new instance to the collection.
+			// Returns the number of instances.
+			int Instance(gObj<GeometryCollection> geometry,
+				UINT mask = 255U,
+				int contribution = 0,
+				UINT instanceID = INTSAFE_UINT_MAX,
+				float4x3 transform = float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
+		}* const create;
+
+		int Count();
+
+		CollectionState State();
+
+		void ForceState(CollectionState state);
+
+		// Clear this collection
+		void Clear();
 	};
 
 	class RaytracingManager : public GraphicsManager {
@@ -376,7 +426,8 @@ namespace CA4G {
 		RaytracingManager() : GraphicsManager(), 
 			set(new Setter(this)) ,
 			dispatch(new Dispatcher(this)),
-			create(new Creating(this))
+			create(new Creating(this)),
+			load (new Loading(this))
 		{
 		}
 	public:
@@ -385,17 +436,25 @@ namespace CA4G {
 			RaytracingManager* manager;
 			Creating(RaytracingManager* manager) :manager(manager) {}
 		public:
-			gObj<TriangleGeometryCollection> TriangleGeometries(gObj<BakedGeometry> forReuse = nullptr);
-			gObj<ProceduralGeometryCollection> ProceduralGeometries(gObj<BakedGeometry> forReuse = nullptr);
-			gObj<InstanceCollection> Intances(gObj<BakedScene> forReuse = nullptr);
+			gObj<TriangleGeometryCollection> TriangleGeometries();
+			gObj<ProceduralGeometryCollection> ProceduralGeometries();
+			gObj<InstanceCollection> Intances();
 
-			gObj<BakedGeometry> Baked(gObj<GeometryCollection> geometries, bool allowUpdate, bool preferFastRaycasting);
-			gObj<BakedScene> Baked(gObj<InstanceCollection> instances, bool allowUpdate, bool preferFastRaycasting);
-			
-			gObj<BakedGeometry> Update(gObj<BakedGeometry> geometriesOnGPU);
-			gObj<BakedScene> Update(gObj<BakedScene> instancesOnGPU);
-
+			gObj<GeometryCollection> Attach(gObj<GeometryCollection> collection);
 		}* const create;
+
+		class Loading {
+			friend RaytracingManager;
+			RaytracingManager* manager;
+			Loading(RaytracingManager* manager) :manager(manager) {}
+		public:
+			// Depending on state, builds, updates or rebuilds current collection into GPU buffers.
+			void Geometry(gObj<GeometryCollection> geometries,
+				bool allowUpdate = false, bool preferFastRaycasting = true);
+			// Depending on state, builds, updates or rebuilds current collection into GPU buffers.
+			void Scene(gObj<InstanceCollection> instances,
+				bool allowUpdate = false, bool preferFastRaycasting = true);
+		}* const load;
 
 		class Setter {
 			ICmdManager* wrapper;

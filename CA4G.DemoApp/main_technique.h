@@ -566,10 +566,12 @@ public:
 			void Setup() {
 				__load Shader(Context()->Generating);
 				__load Shader(Context()->Missing);
+				__load Shader(Context()->Hitting);
 			}
 			
 			void Bindings(gObj<RaytracingBinder> binder) {
 				binder _set BindingsOnSet();
+				binder _set ADS(0, Context()->Scene);
 				binder _set UAV(0, Context()->Output);
 				binder _set CBV(0, Context()->Transforms);
 			}
@@ -578,15 +580,19 @@ public:
 
 		void Setup() {
 			__load Code(ShaderLoader::FromFile("./Shaders/Samples/RTXSample_RT.cso"));
-			Generating	= __create Shader<RayGenerationHandle>(L"RayGen");
-			Missing		= __create Shader<MissHandle>(L"Miss");
+			Generating			= __create Shader<RayGenerationHandle>(L"RayGen");
+			Missing				= __create Shader<MissHandle>(L"OnMiss");
+			auto closestHit		= __create Shader<ClosestHitHandle>(L"OnClosestHit");
+			Hitting = __create HitGroup(closestHit, nullptr, nullptr);
 
 			__load Program(MainProgram);
 		}
 
 		gObj<RayGenerationHandle> Generating;
+		gObj<HitGroupHandle> Hitting;
 		gObj<MissHandle> Missing;
 
+		gObj<InstanceCollection> Scene;
 		gObj<Texture2D> Output;
 		gObj<Buffer> Transforms;
 	};
@@ -598,8 +604,8 @@ public:
 		auto desc = scene->getScene();
 
 		// Allocate Memory for scene elements
-		VertexBuffer = __create Buffer_VB<SceneVertex>(desc->Vertices().Count);
-		IndexBuffer = __create Buffer_IB<int>(desc->Indices().Count);
+		VertexBuffer = __create Buffer_SRV<SceneVertex>(desc->Vertices().Count);
+		IndexBuffer = __create Buffer_SRV<int>(desc->Indices().Count);
 		Transforms = __create Buffer_CB<TransformsCB>();
 		GeometryTransforms = __create Buffer_SRV<float4x3>(desc->getTransformsBuffer().Count);
 		InstanceTransforms = __create Buffer_SRV<float4x4>(desc->Instances().Count);
@@ -610,6 +616,8 @@ public:
 		pipeline->Output = OutputImage;
 		
 		__dispatch member_collector(UpdateDirtyElements);
+
+		__dispatch member_collector(CreateSceneOnGPU);
 	}
 
 	void UpdateDirtyElements(gObj<GraphicsManager> manager) {
@@ -657,12 +665,67 @@ public:
 		}
 	}
 
+	gObj<InstanceCollection> rtxScene;
+
+	void CreateSceneOnGPU(gObj<RaytracingManager> manager) {
+		
+		auto desc = scene->getScene();
+		
+		rtxScene = manager _create Intances();
+		for (int i = 0; i < desc->Instances().Count; i++)
+		{
+			auto instance = desc->Instances().Data[i];
+
+			auto geometryCollection = manager _create TriangleGeometries();
+			geometryCollection _set Transforms(GeometryTransforms);
+		
+			for (int j = 0; i < instance.Count; i++) // load every geometry
+			{
+				auto geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
+
+				if (IndexBuffer)
+					geometryCollection _create Geometry(
+						VertexBuffer, IndexBuffer _create Slice(geometry.StartIndex, geometry.IndexCount), 
+						geometry.TransformIndex);
+				else
+					geometryCollection _create Geometry(
+						VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount), 
+						geometry.TransformIndex);
+			}
+
+			manager _load Geometry(geometryCollection);
+
+			rtxScene _create Instance(geometryCollection,
+				255U, 0, i, (float4x3)instance.Transform
+			);
+		}
+
+		manager _load Scene(rtxScene, true, true);
+
+		pipeline->Scene = rtxScene;
+	}
+
 	virtual void OnDispatch() override {
 		// Update dirty elements
 		__dispatch member_collector(UpdateDirtyElements);
 
+		__dispatch member_collector(UpdateSceneOnGPU);
+
 		// Draw current Frame
 		__dispatch member_collector(DrawScene);
+	}
+
+	void UpdateSceneOnGPU(gObj<RaytracingManager> manager) {
+		auto desc = scene->getScene();
+
+		for (int i = 0; i < desc->Instances().Count; i++)
+		{
+			auto instance = desc->Instances().Data[i];
+
+			rtxScene _load InstanceTransform(i, (float4x3)instance.Transform);
+		}
+
+		manager _load Scene(rtxScene, true, true);
 	}
 
 	void DrawScene(gObj<RaytracingManager> manager) {

@@ -364,6 +364,8 @@ namespace CA4G {
 		unsigned int const
 			Stride;
 
+		D3D12_GPU_VIRTUAL_ADDRESS GPUVirtualAddress(int element = 0);
+
 		class Creating {
 			friend Buffer;
 			Buffer* buffer;
