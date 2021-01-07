@@ -8,14 +8,12 @@ namespace CA4G {
 	struct DX_BakedGeometry {
 		DX_Resource bottomLevelAccDS;
 		DX_Resource scratchBottomLevelAccDS;
-		WRAPPED_GPU_POINTER emulatedPtr;
 		long updatingVersion;
 		long structuralVersion;
 	};
 
 	struct DX_BakedScene {
 		DX_Resource topLevelAccDS;
-		WRAPPED_GPU_POINTER topLevelAccFallbackPtr;
 		DX_Resource scratchBuffer;
 		DX_Resource instancesBuffer;
 		void* instancesBufferMap;
@@ -64,11 +62,8 @@ namespace CA4G {
 
 		// List with persistent reference to geometries used by the instances in this collection.
 		gObj<list<gObj<GeometryCollection>>> usedGeometries = new list<gObj<GeometryCollection>>();
-		// Determines if the instances are for a fallback device
-		bool FallbackDeviceUsed = false;
 		// Instances
 		gObj<list<D3D12_RAYTRACING_INSTANCE_DESC>> instances = new list<D3D12_RAYTRACING_INSTANCE_DESC>();
-		gObj<list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>> fallbackInstances = new list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>();
 	};
 
 
@@ -290,12 +285,7 @@ namespace CA4G {
 					if (scene->State() == CollectionState::NotBuilt)
 						throw CA4GException("Scene should be loaded on the GPU first.");
 
-					if (dxwrapper->fallbackDevice)
-					{ // Used Fallback device
-						cmdWrapper->fallbackCmdList->SetTopLevelAccelerationStructure(i, scene->wrapper->gpuVersion->topLevelAccFallbackPtr);
-					}
-					else
-						cmdList->SetComputeRootShaderResourceView(i, scene->wrapper->gpuVersion->topLevelAccDS->GetGPUVirtualAddress());
+					cmdList->SetComputeRootShaderResourceView(i, scene->wrapper->gpuVersion->topLevelAccDS->GetGPUVirtualAddress());
 					break;
 				}
 				}

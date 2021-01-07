@@ -9,7 +9,7 @@ using namespace CA4G;
 //typedef class TriangleSample main_technique;
 //typedef class SceneSample main_technique;
 //typedef class UAVSample main_technique;
-typedef class BasicRaycastSample main_technique;
+typedef class PathtracingTechnique main_technique;
 
 
 #pragma region Async Sample
@@ -748,3 +748,8 @@ public:
 
 #pragma endregion
 
+#pragma region Pathtracing
+
+#include "./Shaders/Pathtracing/PathtracingTechnique.h"
+
+#pragma endregion

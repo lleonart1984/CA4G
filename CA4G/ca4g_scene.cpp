@@ -301,8 +301,8 @@ namespace CA4G {
 					if (r > 0) {
 						//t.readFloatToken(g);
 						//t.readFloatToken(b);
-						currentMaterial.Roulette.x = (1 - r);
-						currentMaterial.Roulette.y = (1 - r);
+						currentMaterial.Roulette.x = (1 - r)*0.5;
+						currentMaterial.Roulette.y = (1 - r)*0.5;
 						currentMaterial.Roulette.z = r;
 					}
 					t.skipCurrentLine();
@@ -316,8 +316,8 @@ namespace CA4G {
 					if (r < 1) {
 						//t.readFloatToken(g);
 						//t.readFloatToken(b);
-						currentMaterial.Roulette.x = r;
-						currentMaterial.Roulette.y = r;
+						currentMaterial.Roulette.x = r*0.5;
+						currentMaterial.Roulette.y = r*0.5;
 						currentMaterial.Roulette.w = 1 - r;
 					}
 					t.skipCurrentLine();
@@ -754,9 +754,16 @@ namespace CA4G {
 			}
 			nextGroupStart = positionIndices.size();
 			if (nextGroupStart != currentGroupStart) { // last range of indices...
-				geometries.add(scene->appendGeometry(vertexOffset, indexOffset, 0, positions.size(), currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
+				geometries.add(scene->appendGeometry(vertexOffset, indexOffset, 0, positions.size(), currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, geometries.size()));
 			}
 
+			#pragma endregion
+
+			#pragma region Generate Identity transforms
+
+			for (int i = 0; i < geometries.size(); i++)
+				scene->appendTransform( float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
+			
 			#pragma endregion
 
 			#pragma region Creating Instances

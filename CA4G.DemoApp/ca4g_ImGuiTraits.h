@@ -20,11 +20,15 @@ void GuiFor(gObj<CA4G::IManageScene> t) {
 
 	LightSource l = t->scene->getMainLight();
 
-	if (
-		ImGui::InputFloat3("Light position", (float*)&l.Position) |
-		ImGui::InputFloat3("Light intensity", (float*)&l.Intensity)
-		)
+	float alpha = atan2f(l.Direction.z, l.Direction.x);
+	float beta = asinf(l.Direction.y);
+	bool changeDirection = ImGui::SliderFloat("Light Direction Alpha", &alpha, 0, 3.141596 * 2);
+	changeDirection |= ImGui::SliderFloat("Light Direction Beta", &beta, -3.141596 / 2, 3.141596 / 2);
+	if (changeDirection |
+		ImGui::InputFloat3("Light intensity", (float*)&l.Intensity)) {
+		l.Direction = float3(cosf(alpha) * cosf(beta), sinf(beta), sinf(alpha) * cosf(beta));
 		t->scene->setMainLightSource(l);
+	}
 
 #pragma endregion
 

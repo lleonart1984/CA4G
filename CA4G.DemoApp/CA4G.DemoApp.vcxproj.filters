@@ -66,6 +66,30 @@
     <ClInclude Include="GUITraits.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Shaders\Tools\Randoms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\Tools\Scattering.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\Tools\Definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\Tools\CommonRT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\Tools\CommonPT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\Tools\CommonComplexity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\Tools\CommonEnvironment.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\Pathtracing\PathtracingTechnique.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CA4G.DemoApp.cpp">
@@ -113,5 +137,6 @@
     <FxCompile Include="Shaders\Samples\Basic_PS.hlsl" />
     <FxCompile Include="Shaders\Samples\Counting_PS.hlsl" />
     <FxCompile Include="Shaders\Samples\RTXSample_RT.hlsl" />
+    <FxCompile Include="Shaders\Pathtracing\Pathtracing_RT.hlsl" />
   </ItemGroup>
 </Project>

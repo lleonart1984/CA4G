@@ -614,6 +614,8 @@ namespace CA4G {
 				currentVersion.Upgrade(SceneElement::Vertices);
 			if (this->scene->Indices().Count > 0)
 				currentVersion.Upgrade(SceneElement::Indices);
+			if (this->scene->Materials().Count > 0)
+				currentVersion.Upgrade(SceneElement::Materials);
 			if (this->scene->getTransformsBuffer().Count > 0)
 				currentVersion.Upgrade(SceneElement::GeometryTransforms);
 			if (this->scene->getTextures().Count > 0)

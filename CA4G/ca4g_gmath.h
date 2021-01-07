@@ -233,6 +233,15 @@ namespace CA4G {
 		}
 		//
 
+		static float4x4 FromAffine(float4x3 affine) {
+			return float4x4(
+				affine._m00, affine._m01, affine._m02, 0,
+				affine._m10, affine._m11, affine._m12, 0,
+				affine._m20, affine._m21, affine._m22, 0,
+				affine._m30, affine._m31, affine._m32, 1
+			);
+		}
+
 		// Rotations
 		/// <summary>
 		/// Rotation mat around Z axis

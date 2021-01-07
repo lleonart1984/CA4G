@@ -16,7 +16,6 @@ namespace CA4G {
 
 	struct DX_Wrapper {
 		DX_Device device;
-		DX_FallbackDevice fallbackDevice;
 		ID3D12Debug* debugController;
 
 		HWND hWnd;
@@ -66,7 +65,6 @@ namespace CA4G {
 			UseWarpDevice = false;
 			UseFrameBuffering = false;
 			device = nullptr;
-			fallbackDevice = nullptr;
 			debugController = nullptr;
 			fullScreenDesc.Windowed = true;
 			swapChainDesc.BufferCount = 2;
@@ -749,7 +747,6 @@ namespace CA4G {
 	
 	struct DX_CmdWrapper {
 		DX_Wrapper* dxWrapper;
-		DX_FallbackCommandList fallbackCmdList;
 		DX_CommandList cmdList = nullptr;
 		gObj<IPipelineBindings> currentPipeline = nullptr;
 		gObj<RTProgramBase> activeProgram = nullptr;
@@ -983,8 +980,6 @@ namespace CA4G {
 					DX_CmdWrapper* cmdWrapper = new DX_CmdWrapper();
 					cmdWrapper->dxWrapper = this->dxWrapper;
 					cmdWrapper->cmdList = info.threadInfos[j].cmdList;
-					if (this->dxWrapper->fallbackDevice != nullptr)
-						dxWrapper->fallbackDevice->QueryRaytracingCommandList(cmdWrapper->cmdList, IID_PPV_ARGS(&cmdWrapper->fallbackCmdList));
 					info.threadInfos[j].manager->__InternalDXCmdWrapper = cmdWrapper;
 				}
 			}
@@ -1023,6 +1018,9 @@ namespace CA4G {
 
 			for (int e = 0; e < 3; e++)
 				Engines[e].frames[frame].ResetUsedAllocators();
+
+			dxWrapper->gpu_csu->RestartAllocatorForFrame(frame);
+			dxWrapper->gpu_smp->RestartAllocatorForFrame(frame);
 
 			PrepareRenderTarget(D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}

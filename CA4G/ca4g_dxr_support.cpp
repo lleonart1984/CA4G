@@ -100,7 +100,7 @@ namespace CA4G {
 			byte* shaderRecordStart = (byte*)shadertable.MappedData + shadertable.ShaderRecordSize * index;
 			memcpy(shaderRecordStart, shader->cachedShaderIdentifier, shadertable.ShaderIDSize);
 			if (binder->HasSomeBindings())
-				BindLocalsOnShaderTable(miss_locals, shaderRecordStart + shadertable.ShaderIDSize);
+				BindLocalsOnShaderTable(binder, shaderRecordStart + shadertable.ShaderIDSize);
 		}
 		void BindLocal(DX_Wrapper* dxWrapper, gObj<RayGenerationHandle> shader) {
 			BindLocal(dxWrapper,
@@ -131,8 +131,6 @@ namespace CA4G {
 		list<gObj<RTProgramBase>> programs = {};
 		// Pipeline object state created for this pipeline.
 		DX_StateObject stateObject;
-		// Pipeline object state created for this pipeline in case of fallback.
-		DX_FallbackStateObject fallbackStateObject;
 	};
 
 	void RaytracingBinder::Setting::ADS(int slot, gObj<InstanceCollection>& const scene) {
@@ -374,17 +372,10 @@ namespace CA4G {
 		soDesc.NumSubobjects = index;
 		soDesc.pSubobjects = this->dynamicStates;
 
-		if (dxWrapper->fallbackDevice != nullptr) // emulating with fallback device
-		{
-			auto hr = dxWrapper->fallbackDevice->CreateStateObject(&soDesc, IID_PPV_ARGS(&wrapper->fallbackStateObject));
-			if (FAILED(hr))
-				throw CA4GException::FromError(CA4G_Errors_BadPSOConstruction, nullptr, hr);
-		}
-		else {
+		
 			auto hr = dxWrapper->device->CreateStateObject(&soDesc, IID_PPV_ARGS(&wrapper->stateObject));
 			if (FAILED(hr))
 				throw CA4GException::FromError(CA4G_Errors_BadPSOConstruction, nullptr, hr);
-		}
 
 		// Get All shader identifiers
 		for (int i = 0; i < wrapper->programs.size(); i++)
@@ -393,18 +384,11 @@ namespace CA4G {
 			for (int j = 0; j < prog->wrapper->loadedShaderPrograms.size(); j++) {
 				auto shaderProgram = prog->wrapper->loadedShaderPrograms[j];
 
-				if (dxWrapper->fallbackDevice != nullptr)
-				{
-					shaderProgram->cachedShaderIdentifier = wrapper->fallbackStateObject->GetShaderIdentifier(shaderProgram->shaderHandle);
-				}
-				else // DirectX Raytracing
-				{
-					CComPtr<ID3D12StateObject> __so = wrapper->stateObject;
-					CComPtr<ID3D12StateObjectProperties> __soProp;
-					__so->QueryInterface<ID3D12StateObjectProperties>(&__soProp);
+				CComPtr<ID3D12StateObject> __so = wrapper->stateObject;
+				CComPtr<ID3D12StateObjectProperties> __soProp;
+				__so->QueryInterface<ID3D12StateObjectProperties>(&__soProp);
 
-					shaderProgram->cachedShaderIdentifier = __soProp->GetShaderIdentifier(shaderProgram->shaderHandle);
-				}
+				shaderProgram->cachedShaderIdentifier = __soProp->GetShaderIdentifier(shaderProgram->shaderHandle);
 			}
 		}
 	}
@@ -495,10 +479,7 @@ namespace CA4G {
 
 		// Create Shader Tables
 		UINT shaderIdentifierSize;
-		if (dxWrapper->fallbackDevice != nullptr)
-			shaderIdentifierSize = dxWrapper->fallbackDevice->GetShaderIdentifierSize();
-		else // DirectX Raytracing
-			shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
 		wrapper->raygen_shaderTable = ShaderTable(dxWrapper, shaderIdentifierSize, shaderIdentifierSize + wrapper->rayGen_SignatureSize, 1);
 		wrapper->miss_shaderTable = ShaderTable(dxWrapper, shaderIdentifierSize, shaderIdentifierSize + wrapper->miss_SignatureSize, wrapper->MaxMiss);
@@ -518,10 +499,7 @@ namespace CA4G {
 			wrapper->dxWrapper->gpu_smp->getInnerHeap()
 		};
 
-		if (wrapper->dxWrapper->fallbackDevice)
-			cmdWrapper->__InternalDXCmdWrapper->fallbackCmdList->SetDescriptorHeaps(2, heaps);
-		else
-			cmdWrapper->__InternalDXCmdWrapper->cmdList->SetDescriptorHeaps(2, heaps);
+		cmdWrapper->__InternalDXCmdWrapper->cmdList->SetDescriptorHeaps(2, heaps);
 	}
 
 	void CA4G::RaytracingPipelineBindings::OnDispatch(ICmdManager* cmdWrapper) {
@@ -535,10 +513,7 @@ namespace CA4G {
 		DX_CmdWrapper* cmdWrapper = this->wrapper->__InternalDXCmdWrapper;
 		cmdWrapper->currentPipeline = pipeline;
 
-		if (this->wrapper->__InternalDXCmdWrapper->fallbackCmdList != nullptr)
-			this->wrapper->__InternalDXCmdWrapper->fallbackCmdList->SetPipelineState1(pipeline->wrapper->fallbackStateObject);
-		else
-			this->wrapper->__InternalDXCmdWrapper->cmdList->SetPipelineState1(pipeline->wrapper->stateObject);
+		this->wrapper->__InternalDXCmdWrapper->cmdList->SetPipelineState1(pipeline->wrapper->stateObject);
 
 		pipeline->OnSet(this->wrapper);
 	}
@@ -598,14 +573,7 @@ namespace CA4G {
 		};
 
 		D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
-		if (manager->__InternalDXCmdWrapper->fallbackCmdList)
-		{
-			DispatchRays(manager->__InternalDXCmdWrapper->fallbackCmdList, currentBindings->wrapper->fallbackStateObject, &dispatchDesc);
-		}
-		else // DirectX Raytracing
-		{
-			DispatchRays(manager->__InternalDXCmdWrapper->cmdList, currentBindings->wrapper->stateObject, &dispatchDesc);
-		}
+		DispatchRays(manager->__InternalDXCmdWrapper->cmdList, currentBindings->wrapper->stateObject, &dispatchDesc);
 
 		D3D12_RESOURCE_BARRIER b = { };
 		b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
@@ -813,79 +781,43 @@ namespace CA4G {
 	{
 		if (geometries->wrapper->gpuVersion.isNull())
 			throw CA4GException("Geometry collection should be loaded on the GPU first.");
-		
+
 		manager->wrapper->usedGeometries[instance] = geometries;
-		
-		if (manager->wrapper->FallbackDeviceUsed)
-		{
-			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC& desc = manager->wrapper->fallbackInstances[instance];
-			desc.AccelerationStructure = geometries->wrapper->gpuVersion->emulatedPtr;
-		}
-		else
-		{
-			D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
-			desc.AccelerationStructure = geometries->wrapper->gpuVersion->bottomLevelAccDS->GetGPUVirtualAddress();
-		}
+
+
+		D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
+		desc.AccelerationStructure = geometries->wrapper->gpuVersion->bottomLevelAccDS->GetGPUVirtualAddress();
 		manager->wrapper->updatingVersion++;
 	}
 
 	void CA4G::InstanceCollection::Loading::InstanceMask(int instance, UINT mask)
 	{
-		if (manager->wrapper->FallbackDeviceUsed)
-		{
-			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC& desc = manager->wrapper->fallbackInstances[instance];
-			desc.InstanceMask = mask;
-		}
-		else
-		{
-			D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
-			desc.InstanceMask = mask;
-		}
+		D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
+		desc.InstanceMask = mask;
 		manager->wrapper->updatingVersion++;
 	}
 
 	void CA4G::InstanceCollection::Loading::InstanceContribution(int instance, int instanceContribution)
 	{
-		if (manager->wrapper->FallbackDeviceUsed)
-		{
-			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC& desc = manager->wrapper->fallbackInstances[instance];
-			desc.InstanceContributionToHitGroupIndex = instanceContribution;
-		}
-		else
-		{
-			D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
-			desc.InstanceContributionToHitGroupIndex = instanceContribution;
-		}
+
+		D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
+		desc.InstanceContributionToHitGroupIndex = instanceContribution;
 		manager->wrapper->updatingVersion++;
 	}
 
 	void CA4G::InstanceCollection::Loading::InstanceID(int instance, UINT instanceID)
 	{
-		if (manager->wrapper->FallbackDeviceUsed)
-		{
-			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC& desc = manager->wrapper->fallbackInstances[instance];
-			desc.InstanceID = instanceID;
-		}
-		else
-		{
-			D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
-			desc.InstanceID = instanceID;
-		}
+
+		D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
+		desc.InstanceID = instanceID;
 		manager->wrapper->updatingVersion++;
 	}
 
 	void CA4G::InstanceCollection::Loading::InstanceTransform(int instance, float4x3 transform)
 	{
-		if (manager->wrapper->FallbackDeviceUsed)
-		{
-			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC& desc = manager->wrapper->fallbackInstances[instance];
-			FillMat4x3(desc.Transform, transform);
-		}
-		else
-		{
-			D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
-			FillMat4x3(desc.Transform, transform);
-		}
+
+		D3D12_RAYTRACING_INSTANCE_DESC& desc = manager->wrapper->instances[instance];
+		FillMat4x3(desc.Transform, transform);
 		manager->wrapper->updatingVersion++;
 	}
 
@@ -895,42 +827,26 @@ namespace CA4G {
 			throw CA4GException("Geometry collection should be loaded on the GPU first.");
 
 		auto wrapper = manager->wrapper;
-		
+
 		wrapper->usedGeometries->add(geometries);
 		wrapper->structuralVersion++;
 
-		if (wrapper->FallbackDeviceUsed) {
-			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC d{ };
-			FillMat4x3(d.Transform, transform);
-			d.InstanceMask = mask;
-			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			//d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
-			d.InstanceContributionToHitGroupIndex = instanceContribution;
-			d.AccelerationStructure = geometries->wrapper->gpuVersion->emulatedPtr;
-			int index = wrapper->fallbackInstances->size();
-			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
-			wrapper->fallbackInstances->add(d);
-			return wrapper->fallbackInstances->size();
-		}
-		else {
-			D3D12_RAYTRACING_INSTANCE_DESC d{ };
-			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			FillMat4x3(d.Transform, transform);
-			d.InstanceMask = mask;
-			d.InstanceContributionToHitGroupIndex = instanceContribution;
-			d.AccelerationStructure = geometries->wrapper->gpuVersion->bottomLevelAccDS->GetGPUVirtualAddress();
-			int index = wrapper->instances->size();
-			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
-			wrapper->instances->add(d);
-			return wrapper->instances->size();
-		}
+
+		D3D12_RAYTRACING_INSTANCE_DESC d{ };
+		d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		FillMat4x3(d.Transform, transform);
+		d.InstanceMask = mask;
+		d.InstanceContributionToHitGroupIndex = instanceContribution;
+		d.AccelerationStructure = geometries->wrapper->gpuVersion->bottomLevelAccDS->GetGPUVirtualAddress();
+		int index = wrapper->instances->size();
+		d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
+		wrapper->instances->add(d);
+		return wrapper->instances->size();
 	}
 
 	int CA4G::InstanceCollection::Count()
 	{
-		return wrapper->FallbackDeviceUsed ? 
-			wrapper->fallbackInstances->size() :
-			wrapper->instances->size();
+		return wrapper->instances->size();
 	}
 
 	CollectionState CA4G::InstanceCollection::State()
@@ -961,14 +877,12 @@ namespace CA4G {
 	void CA4G::InstanceCollection::Clear()
 	{
 		wrapper->instances->reset();
-		wrapper->fallbackInstances->reset();
 		wrapper->usedGeometries->reset();
 		wrapper->structuralVersion++;
 	}
 
 	gObj<InstanceCollection> RaytracingManager::Creating::Intances() {
 		DX_InstanceCollectionWrapper* wrapper = new DX_InstanceCollectionWrapper();
-		wrapper->FallbackDeviceUsed = manager->__InternalDXCmdWrapper->dxWrapper->fallbackDevice != nullptr;
 		InstanceCollection* result = new InstanceCollection();
 		result->wrapper = wrapper;
 		return result;
@@ -995,28 +909,6 @@ namespace CA4G {
 		return collection;
 	}
 
-
-	// Create a wrapped pointer for the Fallback Layer path.
-	WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(DX_Wrapper* dxWrapper, DX_Resource resource, UINT bufferNumElements)
-	{
-		D3D12_UNORDERED_ACCESS_VIEW_DESC rawBufferUavDesc = {};
-		rawBufferUavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-		rawBufferUavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-		rawBufferUavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-		rawBufferUavDesc.Buffer.NumElements = bufferNumElements;
-
-		D3D12_CPU_DESCRIPTOR_HANDLE bottomLevelDescriptor;
-
-		// Only compute fallback requires a valid descriptor index when creating a wrapped pointer.
-		UINT descriptorHeapIndex = 0;
-		if (!dxWrapper->fallbackDevice->UsingRaytracingDriver())
-		{
-			descriptorHeapIndex = dxWrapper->gpu_csu->AllocatePersistent();
-			bottomLevelDescriptor = dxWrapper->gpu_csu->getCPUVersion(descriptorHeapIndex);
-			dxWrapper->device->CreateUnorderedAccessView(resource, nullptr, &rawBufferUavDesc, bottomLevelDescriptor);
-		}
-		return dxWrapper->fallbackDevice->GetWrappedPointerSimple(descriptorHeapIndex, resource->GetGPUVirtualAddress());
-	}
 
 	void RaytracingManager::Loading::Geometry(gObj<GeometryCollection> geometries, bool allowUpdate, bool preferFastRaycasting)
 	{
@@ -1049,13 +941,11 @@ namespace CA4G {
 
 		DX_Resource scratchBuffer;
 		DX_Resource finalBuffer;
-		WRAPPED_GPU_POINTER fallbackEmulatedPtr = {};
 
 		if (geometries->State() == CollectionState::NeedsUpdate)
 		{ // can use same old buffers
 			scratchBuffer = geometries->wrapper->gpuVersion->scratchBottomLevelAccDS;
 			finalBuffer = geometries->wrapper->gpuVersion->bottomLevelAccDS;
-			fallbackEmulatedPtr = geometries->wrapper->gpuVersion->emulatedPtr;
 		}
 		else
 		{ // need to consider creating a new buffer
@@ -1063,16 +953,9 @@ namespace CA4G {
 			// Compute sizes for the new buffers...
 			D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
 			D3D12_RESOURCE_STATES initialResourceState;
-			if (dxWrapper->fallbackDevice != nullptr)
-			{
-				dxWrapper->fallbackDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
-				initialResourceState = dxWrapper->fallbackDevice->GetAccelerationStructureResourceState();
-			}
-			else // DirectX Raytracing
-			{
+			
 				dxWrapper->device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
 				initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-			}
 
 			if (geometries->State() == CollectionState::NotBuilt ||
 				geometries->wrapper->gpuVersion->scratchBottomLevelAccDS->GetDesc().Width < prebuildInfo.ScratchDataSizeInBytes)
@@ -1095,18 +978,11 @@ namespace CA4G {
 
 				auto finalV = CA4G::Creating::CustomDXResource(dxWrapper, 1, desc, initialResourceState);
 				finalBuffer = finalV->__InternalDXWrapper->resource;
-
-				if (dxWrapper->fallbackDevice != nullptr) {
-					// store an emulated gpu pointer via UAV
-					UINT numBufferElements = static_cast<UINT>(prebuildInfo.ResultDataMaxSizeInBytes) / sizeof(UINT32);
-					fallbackEmulatedPtr = CreateFallbackWrappedPointer(dxWrapper, finalBuffer, numBufferElements);
-				}
 			}
 			else
 			{ // can use same old buffers because there is sufficent space
 				scratchBuffer = geometries->wrapper->gpuVersion->scratchBottomLevelAccDS;
 				finalBuffer = geometries->wrapper->gpuVersion->bottomLevelAccDS;
-				fallbackEmulatedPtr = geometries->wrapper->gpuVersion->emulatedPtr;
 			}
 		}
 		
@@ -1120,12 +996,7 @@ namespace CA4G {
 		if (geometries->State() == CollectionState::NeedsUpdate)
 			bottomLevelBuildDesc.SourceAccelerationStructureData = finalBuffer->GetGPUVirtualAddress();
 
-		if (dxWrapper->fallbackDevice != nullptr)
-		{
-			manager->__InternalDXCmdWrapper->fallbackCmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-		}
-		else
-			manager->__InternalDXCmdWrapper->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+		manager->__InternalDXCmdWrapper->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 		
 		// Add barrier to wait for ADS construction
 		D3D12_RESOURCE_BARRIER barrier = {};
@@ -1136,7 +1007,6 @@ namespace CA4G {
 
 		baked->bottomLevelAccDS = finalBuffer;
 		baked->scratchBottomLevelAccDS = scratchBuffer;
-		baked->emulatedPtr = fallbackEmulatedPtr;
 		baked->updatingVersion = geometries->wrapper->updatingVersion;
 		baked->structuralVersion = geometries->wrapper->structuralVersion;
 		geometries->wrapper->allowsUpdating |= allowUpdate;
@@ -1160,28 +1030,21 @@ namespace CA4G {
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Flags = buildFlags;
-		if (dxWrapper->fallbackDevice != nullptr)
-			inputs.NumDescs = instanceCollection->fallbackInstances->size();
-		else
-			inputs.NumDescs = instanceCollection->instances->size();
+		inputs.NumDescs = instanceCollection->instances->size();
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
 		DX_Resource scratchBuffer;
 		DX_Resource finalBuffer;
-		WRAPPED_GPU_POINTER fallbackEmulatedPtr = {};
 		DX_Resource instanceBuffer;
 		void* instanceBufferMap;
 
-		int instanceBufferWidth = (dxWrapper->fallbackDevice) ?
-			instanceCollection->fallbackInstances->size() * sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) :
-			instanceCollection->instances->size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
+		int instanceBufferWidth = instanceCollection->instances->size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
 
 		if (instances->State() == CollectionState::NeedsUpdate)
 		{ // use the same buffers to update
 			scratchBuffer = instanceCollection->gpuVersion->scratchBuffer;
 			finalBuffer = instanceCollection->gpuVersion->topLevelAccDS;
-			fallbackEmulatedPtr = instanceCollection->gpuVersion->topLevelAccFallbackPtr;
 			instanceBuffer = instanceCollection->gpuVersion->instancesBuffer;
 			instanceBufferMap = instanceCollection->gpuVersion->instancesBufferMap;
 		}
@@ -1190,16 +1053,9 @@ namespace CA4G {
 			D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
 			D3D12_RESOURCE_STATES initialResourceState;
 
-			if (dxWrapper->fallbackDevice != nullptr)
-			{
-				dxWrapper->fallbackDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
-				initialResourceState = dxWrapper->fallbackDevice->GetAccelerationStructureResourceState();
-			}
-			else // DirectX Raytracing
-			{
+			
 				dxWrapper->device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
 				initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-			}
 
 			if (instances->State() == CollectionState::NotBuilt ||
 				instanceCollection->gpuVersion->scratchBuffer->GetDesc().Width < prebuildInfo.ScratchDataSizeInBytes)
@@ -1224,12 +1080,6 @@ namespace CA4G {
 				auto finalV = CA4G::Creating::CustomDXResource(dxWrapper, 1, desc, initialResourceState);
 				finalBuffer = finalV->__InternalDXWrapper->resource;
 
-				if (dxWrapper->fallbackDevice != nullptr) {
-					// store an emulated gpu pointer via UAV
-					UINT numBufferElements = static_cast<UINT>(prebuildInfo.ResultDataMaxSizeInBytes) / sizeof(UINT32);
-					fallbackEmulatedPtr = CreateFallbackWrappedPointer(dxWrapper, finalBuffer, numBufferElements);
-				}
-
 				// Creating instance buffer
 				desc.Width = instanceBufferWidth;
 				desc.Flags = D3D12_RESOURCE_FLAG_NONE;
@@ -1243,17 +1093,13 @@ namespace CA4G {
 			{ // can reuse same space
 				scratchBuffer = instanceCollection->gpuVersion->scratchBuffer;
 				finalBuffer = instanceCollection->gpuVersion->topLevelAccDS;
-				fallbackEmulatedPtr = instanceCollection->gpuVersion->topLevelAccFallbackPtr;
 				instanceBuffer = instanceCollection->gpuVersion->instancesBuffer;
 				instanceBufferMap = instanceCollection->gpuVersion->instancesBufferMap;
 			}
 		}
 
 		// Update instance buffer with instances
-		if (dxWrapper->fallbackDevice)
-			memcpy(instanceBufferMap, (void*)&instanceCollection->fallbackInstances->first(), instanceBufferWidth);
-		else
-			memcpy(instanceBufferMap, (void*)&instanceCollection->instances->first(), instanceBufferWidth);
+		memcpy(instanceBufferMap, (void*)&instanceCollection->instances->first(), instanceBufferWidth);
 
 		// Build acc structure
 
@@ -1268,12 +1114,7 @@ namespace CA4G {
 		if (instances->State() == CollectionState::NeedsUpdate)
 			topLevelBuildDesc.SourceAccelerationStructureData = finalBuffer->GetGPUVirtualAddress();
 
-		if (dxWrapper->fallbackDevice)
-		{
-			manager->__InternalDXCmdWrapper->fallbackCmdList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
-		}
-		else
-			manager->__InternalDXCmdWrapper->cmdList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+		manager->__InternalDXCmdWrapper->cmdList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
 
 		gObj<DX_BakedScene> baked;
 		if (instances->State() == CollectionState::NotBuilt)
@@ -1283,7 +1124,6 @@ namespace CA4G {
 
 		baked->scratchBuffer = scratchBuffer;
 		baked->topLevelAccDS = finalBuffer;
-		baked->topLevelAccFallbackPtr = fallbackEmulatedPtr;
 		baked->instancesBuffer = instanceBuffer;
 		baked->instancesBufferMap = instanceBufferMap;
 

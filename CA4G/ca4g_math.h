@@ -132,6 +132,7 @@ namespace CA4G {
 			if (idx == 1) return this->y;
 			return __TRASH; // Silent return ... valid for HLSL
 		}
+		int2() : int2(0, 0) {}
 		int2(int x, int y) {
 			this->x = x;
 			this->y = y;
