@@ -237,6 +237,11 @@ namespace CA4G {
 		void addMaterial(string name, SceneMaterial material) {
 			materialNames.add(name);
 			scene->appendMaterial(material);
+			scene->appendVolumeMaterial(VolumeMaterial{
+				float3(0,0,0),
+				float3(1,1,1),
+				float3(0,0,0)
+				});
 		}
 
 		void importMTLFile(string subdir, string fileName) {

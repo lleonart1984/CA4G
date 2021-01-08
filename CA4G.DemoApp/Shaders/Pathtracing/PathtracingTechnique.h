@@ -33,7 +33,8 @@ public:
 				binder _set SRV(1, Context()->IndexBuffer);
 				binder _set SRV(2, Context()->Transforms);
 				binder _set SRV(3, Context()->Materials);
-				binder _set SRV_Array(4, Context()->Textures, Context()->TextureCount);
+				binder _set SRV(4, Context()->VolMaterials);
+				binder _set SRV_Array(5, Context()->Textures, Context()->TextureCount);
 				binder _set SMP_Static(0, Sampler::Linear());
 				binder _set CBV(1, Context()->AccumulativeInfo);
 
@@ -70,6 +71,7 @@ public:
 		gObj<Buffer> IndexBuffer;
 		gObj<Buffer> Transforms;
 		gObj<Buffer> Materials;
+		gObj<Buffer> VolMaterials;
 		gObj<Texture2D>* Textures;
 		int TextureCount;
 		gObj<Texture2D> OutputImage;
@@ -120,6 +122,7 @@ public:
 		pipeline->IndexBuffer = __create Buffer_SRV<int>(desc->Indices().Count);
 		pipeline->Transforms = __create Buffer_SRV<float4x3>(globalGeometryCount);
 		pipeline->Materials = __create Buffer_SRV<SceneMaterial>(desc->Materials().Count);
+		pipeline->VolMaterials = __create Buffer_SRV<VolumeMaterial>(desc->Materials().Count);
 		pipeline->TextureCount = desc->getTextures().Count;
 		pipeline->Textures = new gObj<Texture2D>[desc->getTextures().Count];
 		for (int i = 0; i < pipeline->TextureCount; i++)
@@ -131,14 +134,36 @@ public:
 		pipeline->Lighting = __create Buffer_CB<LightingCB>();
 		pipeline->ProjectionToWorld = __create Buffer_CB<float4x4>();
 
-		__dispatch member_collector(UpdateDirtyElements);
+		__dispatch member_collector(LoadAssets);
 
-		__dispatch member_collector(CreateSceneOnGPU);
+		__dispatch member_collector(CreateRTXScene);
 	}
 
-	void UpdateDirtyElements(gObj<GraphicsManager> manager) {
+	void LoadAssets(gObj<GraphicsManager> manager) {
+		SceneElement elements = scene->Updated(sceneVersion);
+		UpdateBuffers(manager, elements);
+	}
 
-		auto elements = scene->Updated(sceneVersion);
+	virtual void OnDispatch() override {
+		// Update dirty elements
+		__dispatch member_collector(UpdateAssets);
+
+		// Draw current Frame
+		__dispatch member_collector(DrawScene);
+	}
+
+	void UpdateAssets(gObj<RaytracingManager> manager) {
+		SceneElement elements = scene->Updated(sceneVersion);
+		UpdateBuffers(manager, elements);
+
+		if (+(elements & SceneElement::InstanceTransforms))
+			UpdateRTXScene(manager);
+
+		if (elements != SceneElement::None)
+			pipeline->AccumulativeInfo.x = 0; // restart frame for Pathtracing...
+	}
+
+	void UpdateBuffers(gObj<GraphicsManager> manager, SceneElement elements) {
 		auto desc = scene->getScene();
 
 		if (+(elements & SceneElement::Vertices))
@@ -156,7 +181,9 @@ public:
 		if (+(elements & SceneElement::Materials))
 		{
 			pipeline->Materials _copy FromPtr(desc->Materials().Data);
+			pipeline->VolMaterials _copy FromPtr(desc->VolumeMaterials().Data);
 			manager _load AllToGPU(pipeline->Materials);
+			manager _load AllToGPU(pipeline->VolMaterials);
 		}
 
 		if (+(elements & SceneElement::Textures)) {
@@ -216,7 +243,7 @@ public:
 
 	gObj<InstanceCollection> rtxScene;
 
-	void CreateSceneOnGPU(gObj<RaytracingManager> manager) {
+	void CreateRTXScene(gObj<RaytracingManager> manager) {
 
 		auto desc = scene->getScene();
 
@@ -253,78 +280,18 @@ public:
 		pipeline->Scene = rtxScene;
 	}
 
-	virtual void OnDispatch() override {
-		// Update dirty elements
-		//__dispatch member_collector(UpdateDirtyElements);
+	void UpdateRTXScene(gObj<RaytracingManager> manager) {
 
-		__dispatch member_collector(UpdateSceneOnGPU);
-
-		// Draw current Frame
-		__dispatch member_collector(DrawScene);
-	}
-
-	void UpdateSceneOnGPU(gObj<RaytracingManager> manager) {
 		auto desc = scene->getScene();
-		auto elements = scene->Updated(sceneVersion);
 
-		if (+(elements & SceneElement::Camera))
+		for (int i = 0; i < desc->Instances().Count; i++)
 		{
-			float4x4 proj, view;
-			scene->getCamera().GetMatrices(render_target->Width, render_target->Height, view, proj);
-			pipeline->ProjectionToWorld _copy FromValue(mul(inverse(proj), inverse(view)));
-			manager.Dynamic_Cast<GraphicsManager>() _load AllToGPU(pipeline->ProjectionToWorld);
+			auto instance = desc->Instances().Data[i];
+
+			rtxScene _load InstanceTransform(i, (float4x3)instance.Transform);
 		}
 
-		if (+(elements & SceneElement::Lights))
-		{
-			pipeline->Lighting _copy FromValue(LightingCB{
-					scene->getMainLight().Position, 0,
-					scene->getMainLight().Intensity, 0,
-					scene->getMainLight().Direction, 0
-				});
-			manager.Dynamic_Cast<GraphicsManager>() _load AllToGPU(pipeline->Lighting);
-		}
-
-		if (+(elements & SceneElement::InstanceTransforms)) {
-			for (int i = 0; i < desc->Instances().Count; i++)
-			{
-				auto instance = desc->Instances().Data[i];
-
-				rtxScene _load InstanceTransform(i, (float4x3)instance.Transform);
-			}
-
-			manager _load Scene(rtxScene);
-		}
-
-		if (+(elements & SceneElement::GeometryTransforms) ||
-			+(elements & SceneElement::InstanceTransforms))
-		{
-			int transformIndex = 0;
-			for (int i = 0; i < desc->Instances().Count; i++)
-			{
-				auto instance = desc->Instances().Data[i];
-				for (int j = 0; j < instance.Count; j++) {
-					auto geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
-
-					float4x4 geometryTransform = geometry.TransformIndex == -1 ?
-						float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1) :
-						Transforms::FromAffine(desc->getTransformsBuffer().Data[geometry.TransformIndex]);
-
-					(pipeline->Transforms _create Slice(transformIndex, 1)) _copy FromValue(
-						(float4x3)mul(geometryTransform, instance.Transform)
-					);
-					transformIndex++;
-				}
-			}
-
-			manager.Dynamic_Cast<GraphicsManager>() _load AllToGPU(pipeline->Transforms);
-		}
-
-		if (elements != SceneElement::None)
-		{
-			manager _clear UAV(pipeline->Accumulation, uint4(0));
-			pipeline->AccumulativeInfo.x = 0;
-		}
+		manager _load Scene(rtxScene);
 	}
 
 	void DrawScene(gObj<RaytracingManager> manager) {
@@ -359,6 +326,9 @@ public:
 
 			firstTime = false;
 		}
+
+		if (pipeline->AccumulativeInfo.x == 0) // first frame after scene dirty
+			manager _clear UAV(pipeline->Accumulation, uint4(0));
 
 		pipeline->AccumulativeInfo.x++;
 

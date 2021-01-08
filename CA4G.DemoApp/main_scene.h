@@ -73,7 +73,7 @@ public:
 		camera.Position = float3(0, 0.4, 2);
 		camera.Target = float3(0, 0.4, 0);
 		lights[0].Direction = normalize(float3(1, 1, 1));
-		lights[0].Intensity = float3(1, 1, 1);
+		lights[0].Intensity = float3(10, 10, 10);
 
 		CA4G::string desktopPath = desktop_directory();
 		CA4G::string lucyPath = desktopPath + CA4G::string("\\Models\\newLucy.obj");
@@ -89,7 +89,7 @@ public:
 		);
 		scene->appendScene(lucyScene);
 
-		CA4G::string dragoPath = desktopPath + CA4G::string("\\Models\\dragon.obj");
+		CA4G::string dragoPath = desktopPath + CA4G::string("\\Models\\newDragon.obj");
 		auto dragoScene = OBJLoader::Load(dragoPath);
 		dragoScene->Normalize(
 			SceneNormalization::Scale |

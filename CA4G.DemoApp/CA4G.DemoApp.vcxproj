@@ -201,6 +201,7 @@
     <ClInclude Include="Shaders\Tools\CommonPT.h" />
     <ClInclude Include="Shaders\Tools\CommonRT.h" />
     <ClInclude Include="Shaders\Tools\Definitions.h" />
+    <ClInclude Include="Shaders\Tools\HGPhaseFunction.h" />
     <ClInclude Include="Shaders\Tools\Randoms.h" />
     <ClInclude Include="Shaders\Tools\Scattering.h" />
     <ClInclude Include="targetver.h" />

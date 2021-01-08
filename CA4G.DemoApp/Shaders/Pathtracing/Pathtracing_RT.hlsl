@@ -23,6 +23,8 @@ cbuffer Transforming : register(b1) {
 	float4x4 FromProjectionToWorld;
 }
 
+#include "../Tools/HGPhaseFunction.h"
+
 struct RayPayload // Only used for raycasting
 {
 	int VertexOffset;
@@ -73,14 +75,14 @@ void SurfelScattering(inout float3 x, inout float3 w, inout float3 importance, V
 	importance *= max(0, ratio);
 	// Update scattered ray
 	w = direction;
-	x = surfel.P + sign(dot(direction, fN)) * 0.0001 * fN;
+	x = surfel.P + sign(dot(direction, fN)) * 0.001 * fN;
 }
 
 float3 ComputePath(float3 O, float3 D, inout int complexity)
 {
-	//int cmp = NumberOfPasses % 3;
-	float3 importance = 1;
-	//importance[cmp] = 3;
+	int cmp = NumberOfPasses % 3;
+	float3 importance = 0;
+	importance[cmp] = 3;
 	float3 x = O;
 	float3 w = D;
 
@@ -89,6 +91,8 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 	int bounces = 0;
 
 	float3 result = 0;
+
+	bool isOutside = true;
 
 	[loop]
 	while (any(importance))
@@ -102,26 +106,40 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 
 		RayPayload payload = (RayPayload)0;
 		if (!Intersect(x, w, payload)) // 
-			return importance * (SampleSkybox(w) + SampleLight(w) * (bounces >= 0));
+			return isOutside * importance * (SampleSkybox(w) + SampleLight(w) * (bounces > 0));
 
 		Vertex surfel = (Vertex)0;
 		Material material = (Material)0;
+		VolumeMaterial volMaterial = (VolumeMaterial)0;
 		GetHitInfo(
 			payload.Barycentric, 
 			payload.MaterialIndex,
 			payload.TriangleIndex,
 			payload.VertexOffset,
 			payload.TransformIndex,
-			surfel, material, 0, 0);
+			surfel, material, volMaterial, 0, 0);
 
-		//return GetColor(1 + payload.VertexOffset);
-		//return float3(1,1,1)*0.0001 * payload.TriangleIndex;
-		//return surfel.N;
+		float d = length(surfel.P - x); // Distance to the hit position.
+		float t = isOutside || volMaterial.Extinction[cmp] == 0 ? 100000000 : -log(max(0.000000000001, 1 - random())) / volMaterial.Extinction[cmp];
 
-		if (++bounces > 5)
-			return 0;
+		if (t >= d)
+		{
+			bounces += isOutside;
+			SurfelScattering(x, w, importance, surfel, material);
 
-		SurfelScattering(x, w, importance, surfel, material);
+			if (any(material.Specular) && material.Roulette.w > 0)
+				isOutside = dot(surfel.N, w) >= 0;
+		}
+		else
+		{ // Volume scattering or absorption
+			x += t * w; // free traverse in a medium
+			if (random() < 1 - volMaterial.ScatteringAlbedo[cmp]) // absorption instead
+				return 0;
+			w = ImportanceSamplePhase(volMaterial.G[cmp], w); // scattering event...
+		}
+		
+		if (bounces > 5)
+			break;
 	}
 	return 0;
 }
@@ -169,7 +187,7 @@ void RayGen()
 		color = float3(0, 0, 0);
 
 	if (AccumulationIsComplexity)
-		color = float3 (complexity / 256, (complexity % 256), 0);// // GetColor(volBounces);
+		color = GetColor(complexity);
 
 	Accumulation[raysIndex] += color;
 	Output[raysIndex] = Accumulation[raysIndex] / (NumberOfPasses + 1);

@@ -9,7 +9,8 @@ StructuredBuffer<Vertex> VertexBuffer			: register(t0, space1);	// All vertices 
 StructuredBuffer<int3> IndexBuffer				: register(t1, space1);	// All indices in scene.
 StructuredBuffer<float4x3> Transforms			: register(t2, space1); // All materials.
 StructuredBuffer<Material> Materials			: register(t3, space1); // All materials.
-Texture2D<float4> Textures[500]					: register(t4, space1); // All textures used
+StructuredBuffer<VolumeMaterial> VolMaterials	: register(t4, space1); // All materials.
+Texture2D<float4> Textures[500]					: register(t5, space1); // All textures used
 
 RWTexture2D<float3> Output						: register(u0, space1); // Final Output image from the ray-trace
 
@@ -53,7 +54,10 @@ void GetHitInfo(
 	int triangleIndex, 
 	int vertexOffset,
 	int transformIndex,
-	out Vertex surfel, out Material material, float ddx, float ddy)
+	out Vertex surfel, 
+	out Material material, 
+	out VolumeMaterial volumeMaterial,
+	float ddx, float ddy)
 {
 	int3 indices = vertexOffset + IndexBuffer[triangleIndex];
 	Vertex v1 = VertexBuffer[indices.x];
@@ -70,6 +74,6 @@ void GetHitInfo(
 	surfel = Transform(s, Transforms[transformIndex]);
 
 	material = Materials[materialIndex];
-
+	volumeMaterial = VolMaterials[materialIndex];
 	AugmentHitInfoWithTextureMapping(surfel, material, ddx, ddy);
 }

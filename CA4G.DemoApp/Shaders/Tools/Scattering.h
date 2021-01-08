@@ -134,7 +134,7 @@ void ComputeImpulses(float3 V, Vertex surfel, Material material,
 	invertNormal = NdotV < 0;
 	NdotV = abs(NdotV); // absolute value of the cosine
 	// Ratio between refraction indices depending of exiting or entering to the medium (assuming vaccum medium 1)
-	float eta = invertNormal ? material.RefractionIndex : 1 / material.RefractionIndex;
+	float eta = !invertNormal ? material.RefractionIndex : 1 / material.RefractionIndex;
 	// Compute faced normal
 	fN = invertNormal ? -surfel.N : surfel.N;
 	// Gets the reflection component of fresnel

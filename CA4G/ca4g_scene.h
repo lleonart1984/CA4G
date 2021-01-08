@@ -88,6 +88,16 @@ namespace CA4G {
 		}
 	};
 
+	struct VolumeMaterial
+	{
+		// Gets or sets the density of the medium.
+		float3 Extinction;
+		// Gets or sets the ratio of scattering events. 1- full scattering, 0- full absorption.
+		float3 ScatteringAlbedo;
+		// Gets or sets the Anisotropy factor for a HG phase function approximation of the scattering phase function in this medium.
+		float3 G;
+	};
+
 	template<typename T>
 	struct SceneData {
 		T* Data;
@@ -131,6 +141,7 @@ namespace CA4G {
 		list<SceneVertex> vertices = {};
 		list<int> indices = {};
 		list<SceneMaterial> materials = {};
+		list<VolumeMaterial> volumeMaterials = { };
 		list<float4x3> transforms = {};
 		list<string> textures = {};
 
@@ -201,6 +212,13 @@ namespace CA4G {
 					materials.size()
 			};
 		}
+		SceneData<VolumeMaterial> VolumeMaterials() const
+		{
+			return SceneData<VolumeMaterial>{
+				&volumeMaterials.first(),
+					volumeMaterials.size()
+			};
+		}
 		SceneData<float4x3> getTransformsBuffer() const
 		{
 			return SceneData<float4x3>{
@@ -241,6 +259,10 @@ namespace CA4G {
 
 		inline int appendMaterial(SceneMaterial material) {
 			return materials.add(material);
+		}
+
+		inline int appendVolumeMaterial(VolumeMaterial material) {
+			return volumeMaterials.add(material);
 		}
 
 		inline int appendTransform(float4x3 transform) {
@@ -299,6 +321,7 @@ namespace CA4G {
 				SceneMaterial material = other->materials[i];
 				material.OffsetReferences(textureOffset);
 				this->materials.add(material);
+				this->volumeMaterials.add(other->volumeMaterials[i]);
 			}
 
 			for (int i = 0; i < other->transforms.size(); i++)
@@ -494,7 +517,6 @@ namespace CA4G {
 		float3 Intensity;
 	};
 
-
 	enum class SceneElement {
 		None = 0,
 		Camera  = 1,
@@ -639,6 +661,10 @@ namespace CA4G {
 		void setMainLightSource(const LightSource& light) {
 			lights[0] = light;
 			OnUpdated(SceneElement::Lights);
+		}
+
+		void MakeDirty(SceneElement element) {
+			OnUpdated(element);
 		}
 	};
 
