@@ -1,6 +1,8 @@
 #pragma once
 
-
+void GuiFor(gObj<CA4G::IShowComplexity> t) {
+	ImGui::Checkbox("View Complexity", &t->ShowComplexity);
+}
 
 int selectedMaterial = 0;
 

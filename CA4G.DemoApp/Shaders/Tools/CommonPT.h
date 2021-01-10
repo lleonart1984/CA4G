@@ -5,31 +5,20 @@
 // CB used to count passes of the PT and to know if the output image is a complexity image or the final color.
 cbuffer AccumulativeInfo : register(b1, space1) {
 	uint NumberOfPasses;
-	uint AccumulationIsComplexity;
+	uint ShowComplexity;
 }
 
 RWTexture2D<float3> Accumulation : register(u1, space1); // Auxiliar Accumulation Buffer
+RWTexture2D<uint> Complexity	 : register(u2, space1); // Complexity buffer for debuging
 
 #include "CommonComplexity.h"
 
-void AccumulateOutput(uint2 coord, float3 value) {
+void AccumulateOutput(uint2 coord, float3 value, int complexity) {
+	Accumulation[coord] += value;
+	Complexity[coord] += complexity;
 
-	if (AccumulationIsComplexity) {
-
-		float oldValue = Accumulation[coord].x;
-		float currentValue = (value.x * 256 + value.y);
-		//// Maximum complexity among frames
-		//float newValue = max(oldValue, currentValue);
-
-		// Average complexity among frames
-		float newValue = (oldValue * NumberOfPasses + currentValue) / (NumberOfPasses + 1);
-
-		Accumulation[coord] = float3(newValue, 0, 0);
-
-		Output[coord] = GetColor((int)round(newValue));
-	}
-	else {
-		Accumulation[coord] += value;
+	if (ShowComplexity) 
+		Output[coord] = GetColor((int)round(Complexity[coord] / (NumberOfPasses + 1)));
+	else 
 		Output[coord] = Accumulation[coord] / (NumberOfPasses + 1);
-	}
 }

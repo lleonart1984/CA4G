@@ -29,6 +29,7 @@ public:
 				binder _set Space(1);
 				binder _set UAV(0, Context()->OutputImage);
 				binder _set UAV(1, Context()->Accumulation);
+				binder _set UAV(2, Context()->Complexity);
 				binder _set SRV(0, Context()->VertexBuffer);
 				binder _set SRV(1, Context()->IndexBuffer);
 				binder _set SRV(2, Context()->Transforms);
@@ -76,6 +77,7 @@ public:
 		int TextureCount;
 		gObj<Texture2D> OutputImage;
 		gObj<Texture2D> Accumulation;
+		gObj<Texture2D> Complexity;
 		struct PerGeometryInfo {
 			int StartTriangle;
 			int GeometryVertexOffset;

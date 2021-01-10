@@ -93,6 +93,15 @@
     <ClInclude Include="Shaders\Tools\HGPhaseFunction.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Shaders\Tools\Distances.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\CVAEVolumePathtracing\CVAEPathtracingTechnique.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\CVAEVolumePathtracing\CVAEScatteringModel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CA4G.DemoApp.cpp">
@@ -141,5 +150,10 @@
     <FxCompile Include="Shaders\Samples\Counting_PS.hlsl" />
     <FxCompile Include="Shaders\Samples\RTXSample_RT.hlsl" />
     <FxCompile Include="Shaders\Pathtracing\Pathtracing_RT.hlsl" />
+    <FxCompile Include="Shaders\CVAEVolumePathtracing\TriangleGrid_CS.hlsl" />
+    <FxCompile Include="Shaders\CVAEVolumePathtracing\DistanceFieldInitial_CS.hlsl" />
+    <FxCompile Include="Shaders\CVAEVolumePathtracing\DistanceFieldSpread_CS.hlsl" />
+    <FxCompile Include="Shaders\CVAEVolumePathtracing\CVAEPathtracing_RT.hlsl" />
+    <FxCompile Include="Shaders\CVAEVolumePathtracing\DebugDF_CS.hlsl" />
   </ItemGroup>
 </Project>

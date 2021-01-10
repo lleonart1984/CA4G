@@ -12,6 +12,10 @@ namespace CA4G {
 			this->scene = scene;
 		}
 	};
+
+	struct IShowComplexity {
+		bool ShowComplexity;
+	};
 }
 
 #endif

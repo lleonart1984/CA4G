@@ -539,6 +539,33 @@ namespace CA4G {
 
 #pragma endregion
 
+#pragma region Compute Manager
+
+	void ComputeManager::Setter::Pipeline(gObj<IPipelineBindings> pipeline) {
+		DX_CmdWrapper* cmdWrapper = this->wrapper->__InternalDXCmdWrapper;
+		cmdWrapper->currentPipeline = pipeline;
+
+		pipeline->OnSet(this->wrapper);
+	}
+
+	void ComputeManager::Dispatcher::Threads(int dimx, int dimy, int dimz) {
+
+		DX_CmdWrapper* cmdWrapper = wrapper->__InternalDXCmdWrapper;
+
+		if (!cmdWrapper->currentPipeline) {
+			throw new CA4G::CA4GException("Invalid operation, Pipeline should be set first");
+		}
+		cmdWrapper->currentPipeline->OnDispatch(this->wrapper);
+		cmdWrapper->cmdList->Dispatch(dimx, dimy, dimz);
+
+		// Grant a barrier for all UAVs used
+		D3D12_RESOURCE_BARRIER b = { };
+		b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		b.UAV.pResource = nullptr;
+		cmdWrapper->cmdList->ResourceBarrier(1, &b);
+	}
+#pragma endregion
+
 #pragma region Graphics Manager
 
 	void GraphicsManager::Setter::Pipeline(gObj<IPipelineBindings> pipeline) {

@@ -29,6 +29,7 @@ namespace CA4G {
 	class ICmdManager {
 		friend GPUScheduler;
 		friend CopyManager;
+		friend ComputeManager;
 		friend GraphicsManager;
 		friend RaytracingManager;
 		friend StaticPipelineBindingsBase;
@@ -52,6 +53,7 @@ namespace CA4G {
 		friend Creating;
 		friend Dispatcher;
 		friend CopyManager;
+		friend ComputeManager;
 		friend GraphicsManager;
 		friend RaytracingManager;
 	protected:

@@ -628,6 +628,22 @@ namespace CA4G {
 		SceneManager(): SceneInfo() {
 		}
 
+		void setGlassMaterial(int index, float alpha, float refractionIndex) {
+			SceneMaterial& material = scene->Materials().Data[index];
+			
+			material.RefractionIndex = refractionIndex;
+			material.Specular = CA4G::lerp(material.Specular, float3(1, 1, 1), alpha);
+			material.Roulette = CA4G::lerp(material.Roulette, float4(0, 0, 0, 1), alpha);
+		}
+
+		void setMirrorMaterial(int index, float alpha) {
+			SceneMaterial& material = scene->Materials().Data[index];
+
+			material.Specular = CA4G::lerp(material.Specular, float3(1, 1, 1), alpha);
+			material.Roulette = CA4G::lerp(material.Roulette, float4(0, 0, 1, 0), alpha);
+		}
+
+
 	public:
 		virtual ~SceneManager(){}
 

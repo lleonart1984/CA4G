@@ -101,7 +101,7 @@ namespace CA4G {
 		binder->__InternalBindingObject->AddBinding(collectGlobal, b);
 	}
 	
-	void CA4G::ComputeBinder::Setting::AddDescriptorRange(int slot, D3D12_DESCRIPTOR_RANGE_TYPE type, void* resource)
+	void CA4G::ComputeBinder::Setting::AddDescriptorRange(int slot, D3D12_DESCRIPTOR_RANGE_TYPE type, D3D12_RESOURCE_DIMENSION dimension, void* resource)
 	{
 		D3D12_ROOT_PARAMETER p = { };
 		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -120,12 +120,12 @@ namespace CA4G {
 
 		SlotBinding b{  };
 		b.Root_Parameter = p;
-		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		b.DescriptorData.Dimension = dimension;
 		b.DescriptorData.ptrToResourceViewArray = resource;
 		binder->__InternalBindingObject->AddBinding(collectGlobal, b);
 	}
 
-	void CA4G::ComputeBinder::Setting::AddDescriptorRange(int initialSlot, D3D12_DESCRIPTOR_RANGE_TYPE type, void* resourceArray, int* count)
+	void CA4G::ComputeBinder::Setting::AddDescriptorRange(int initialSlot, D3D12_DESCRIPTOR_RANGE_TYPE type, D3D12_RESOURCE_DIMENSION dimension, void* resourceArray, int* count)
 	{
 		D3D12_ROOT_PARAMETER p = { };
 		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -143,7 +143,7 @@ namespace CA4G {
 
 		SlotBinding b{ };
 		b.Root_Parameter = p;
-		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		b.DescriptorData.Dimension = dimension;
 		b.DescriptorData.ptrToResourceViewArray = resourceArray;
 		b.DescriptorData.ptrToCount = count;
 		binder->__InternalBindingObject->AddBinding(collectGlobal, b);

@@ -8816,9 +8816,9 @@ namespace CA4G {
 
 			void AddConstant(int slot, void* data, int size);
 
-			void AddDescriptorRange(int slot, D3D12_DESCRIPTOR_RANGE_TYPE type, void* resource);
+			void AddDescriptorRange(int slot, D3D12_DESCRIPTOR_RANGE_TYPE type, D3D12_RESOURCE_DIMENSION dimension, void* resource);
 
-			void AddDescriptorRange(int initialSlot, D3D12_DESCRIPTOR_RANGE_TYPE type, void* resourceArray, int* count);
+			void AddDescriptorRange(int initialSlot, D3D12_DESCRIPTOR_RANGE_TYPE type, D3D12_RESOURCE_DIMENSION dimension, void* resourceArray, int* count);
 
 			void AddStaticSampler(int slot, const Sampler& sampler);
 
@@ -8836,7 +8836,9 @@ namespace CA4G {
 
 			void CBV(int slot, gObj<Buffer>& const buffer)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, (void*)&buffer);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 
+					D3D12_RESOURCE_DIMENSION_BUFFER,
+					(void*)&buffer);
 			}
 
 			template<typename T>
@@ -8849,79 +8851,115 @@ namespace CA4G {
 			}
 
 			void SMP(int slot, gObj<Sampler>& const sampler) {
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, (void*)&sampler);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 
+					D3D12_RESOURCE_DIMENSION_UNKNOWN,
+					(void*)&sampler);
 			}
 
 			void SRV(int slot, gObj<Buffer>& const buffer)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&buffer);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_BUFFER,
+					(void*)&buffer);
 			}
 			void SRV(int slot, gObj<Texture1D>& const texture)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&texture);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE1D,
+					(void*)&texture);
 			}
 			void SRV(int slot, gObj<Texture2D>& const texture)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&texture);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+					(void*)&texture);
 			}
 			void SRV(int slot, gObj<Texture3D>& const texture)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&texture);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE3D,
+					(void*)&texture);
 			}
 
 			void UAV(int slot, gObj<Buffer>& const buffer)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&buffer);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_BUFFER,
+					(void*)&buffer);
 			}
 			void UAV(int slot, gObj<Texture1D>& const texture)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&texture);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE1D,
+					(void*)&texture);
 			}
 			void UAV(int slot, gObj<Texture2D>& const texture)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&texture);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+					(void*)&texture);
 			}
 			void UAV(int slot, gObj<Texture3D>& const texture)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&texture);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE3D,
+					(void*)&texture);
 			}
 
 			void SMP_Array(int slot, gObj<Sampler>*& const samplers, int& const count) {
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, (void*)&samplers, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 
+					D3D12_RESOURCE_DIMENSION_UNKNOWN,
+					(void*)&samplers, &count);
 			}
 
 			void SRV_Array(int slot, gObj<Buffer>*& const buffers, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&buffers, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_BUFFER,
+					(void*)&buffers, &count);
 			}
 			void SRV_Array(int slot, gObj<Texture1D>*& const textures, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&textures, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE1D,
+					(void*)&textures, &count);
 			}
 			void SRV_Array(int slot, gObj<Texture2D>*& const textures, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&textures, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+					(void*)&textures, &count);
 			}
 			void SRV_Array(int slot, gObj<Texture3D>*& const textures, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (void*)&textures, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE3D,
+					(void*)&textures, &count);
 			}
 
 			void UAV_Array(int slot, gObj<Buffer>*& const buffers, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&buffers, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_BUFFER,
+					(void*)&buffers, &count);
 			}
 			void UAV_Array(int slot, gObj<Texture1D>*& const textures, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&textures, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE1D,
+					(void*)&textures, &count);
 			}
 			void UAV_Array(int slot, gObj<Texture2D>*& const textures, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&textures, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+					(void*)&textures, &count);
 			}
 			void UAV_Array(int slot, gObj<Texture3D>*& const textures, int& const count)
 			{
-				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (void*)&textures, &count);
+				AddDescriptorRange(slot, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 
+					D3D12_RESOURCE_DIMENSION_TEXTURE3D,
+					(void*)&textures, &count);
 			}
 		} * const set;
 
@@ -9016,7 +9054,7 @@ namespace CA4G {
 	// -- Abstract pipeline object (can be Graphics or Compute)
 	// Allows creation of root signatures and leaves abstract the pipeline state object creation
 	template<typename ...PSS>
-	class StaticPipelineBindings : protected StaticPipelineBindingsBase {
+	class StaticPipelineBindings : public StaticPipelineBindingsBase {
 		friend Creating;
 		friend Dispatcher;
 		
