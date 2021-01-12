@@ -70,8 +70,10 @@ public:
 
 	void SetupScene() {
 
-		camera.Position = float3(0, 0.5, 1.7);
-		camera.Target = float3(0,0.4,0);
+		camera.Position = float3(0, 0.0, 1.7);
+		camera.Target = float3(0,0.0,0);
+		//camera.Position = float3(0, 0.5, 1.7);
+		//camera.Target = float3(0, 0.4, 0);
 		
 		lights[0].Direction = normalize(float3(0, 1, 1));
 		lights[0].Intensity = float3(6, 6, 6);
@@ -84,7 +86,7 @@ public:
 			SceneNormalization::Scale |
 			SceneNormalization::Maximum |
 			//SceneNormalization::MinX |
-			SceneNormalization::MinY |
+			//SceneNormalization::MinY |
 			//SceneNormalization::MinZ |
 			SceneNormalization::Center
 		);
@@ -96,7 +98,7 @@ public:
 			SceneNormalization::Scale |
 			SceneNormalization::Maximum |
 			//SceneNormalization::MinX |
-			SceneNormalization::MinY |
+			//SceneNormalization::MinY |
 			//SceneNormalization::MinZ |
 			SceneNormalization::Center
 		);
@@ -104,11 +106,11 @@ public:
 
 		CA4G::string platePath = desktopPath + CA4G::string("\\Models\\plate.obj");
 		auto plateScene = OBJLoader::Load(platePath);
-		scene->appendScene(plateScene);
+		//scene->appendScene(plateScene);
 
 		setGlassMaterial(0, 1, 1 / 1.5); // glass lucy
 		setGlassMaterial(1, 1, 1 / 1.5); // glass drago
-		setMirrorMaterial(2, 0.3); // reflective plate
+		//setMirrorMaterial(2, 0.3); // reflective plate
 		
 		scene->VolumeMaterials().Data[0] = VolumeMaterial {
 			float3(500, 500, 500), // sigma
