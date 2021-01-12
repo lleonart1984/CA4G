@@ -11,14 +11,11 @@ namespace CA4G {
 	struct GeometryDescription {
 		int StartVertex;
 		int VertexCount;
-		int StartIndex;
-		int IndexCount;
 		int TransformIndex;
 		int MaterialIndex;
 
-		void OffsetReferences(int vertexOffset, int indexOffset, int materialOffset, int transformOffset) {
+		void OffsetReferences(int vertexOffset, int materialOffset, int transformOffset) {
 			this->StartVertex += vertexOffset;
-			if (IndexCount > 0) this->StartIndex += indexOffset;
 			if (MaterialIndex >= 0) this->MaterialIndex += materialOffset;
 			if (TransformIndex >= 0) this->TransformIndex += transformOffset;
 		}
@@ -139,7 +136,6 @@ namespace CA4G {
 		friend SceneBuilder;
 	protected:
 		list<SceneVertex> vertices = {};
-		list<int> indices = {};
 		list<SceneMaterial> materials = {};
 		list<VolumeMaterial> volumeMaterials = { };
 		list<float4x3> transforms = {};
@@ -177,13 +173,10 @@ namespace CA4G {
 						float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0) :
 						transforms[geometry.TransformIndex];
 
-					if (geometry.IndexCount > 0) // indexed geometry
+					for (int k = 0; k < geometry.VertexCount; k++)
 					{
-						for (int k = 0; k < geometry.IndexCount; k++)
-						{
-							SceneVertex v = vertices[indices[geometry.StartIndex + k]];
-							UpdateMinMax(v, transform, instance.Transform);
-						}
+						SceneVertex v = vertices[geometry.StartVertex + k];
+						UpdateMinMax(v, transform, instance.Transform);
 					}
 				}
 			}
@@ -196,13 +189,6 @@ namespace CA4G {
 			return SceneData<SceneVertex>{
 				&vertices.first(),
 					vertices.size()
-			};
-		}
-		SceneData<int> Indices() const
-		{
-			return SceneData<int>{
-				&indices.first(),
-					indices.size()
 			};
 		}
 		SceneData<SceneMaterial> Materials() const
@@ -276,22 +262,12 @@ namespace CA4G {
 			return startVertex;
 		}
 
-		int appendIndices(int* indices, int indexCount) {
-			int startIndex = this->indices.size();
-			for (int i = 0; i < indexCount; i++)
-				this->indices.add(indices[i]);
-			return startIndex;
-		}
-
-		int appendGeometry(int vertexBufferOffset, int indexBufferOffset, 
+		int appendGeometry(int vertexBufferOffset,  
 			int startVertex, int vertexCount, 
-			int startIndex, int indexCount = 0,
 			int materialIndex = -1, int transformIndex = -1) {
 			GeometryDescription geom;
 			geom.StartVertex = startVertex + vertexBufferOffset;
 			geom.VertexCount = vertexCount;
-			geom.StartIndex = startIndex + indexBufferOffset;
-			geom.IndexCount = indexCount;
 			geom.MaterialIndex = materialIndex;
 			geom.TransformIndex = transformIndex;
 			return geometries.add(geom);
@@ -328,11 +304,10 @@ namespace CA4G {
 				this->transforms.add(other->transforms[i]);
 
 			int vertexOffset = this->appendVertices(&other->vertices.first(), other->vertices.size());
-			int indexOffset = this->appendIndices(&other->indices.first(), other->indices.size());
 			for (int i = 0; i < other->geometries.size(); i++)
 			{
 				GeometryDescription geom = other->geometries[i];
-				geom.OffsetReferences(vertexOffset, indexOffset, materialOffset, transformOffset);
+				geom.OffsetReferences(vertexOffset, materialOffset, transformOffset);
 				this->geometries.add(geom);
 			}
 
@@ -522,14 +497,16 @@ namespace CA4G {
 		Camera  = 1,
 		Lights = 2,
 		Vertices = 4,
-		Indices = 8,
+		//Indices = 8,
 		Geometries = 16,
 		Instances = 32,
 		GeometryTransforms = 64,
 		InstanceTransforms = 128,
 		Materials = 256,
 		Textures = 512,
-		All = Camera | Lights | Vertices | Indices | Geometries | Instances | GeometryTransforms | InstanceTransforms | Materials | Textures
+		All = Camera | Lights | Vertices | 
+		//Indices | 
+		Geometries | Instances | GeometryTransforms | InstanceTransforms | Materials | Textures
 	};
 
 	static SceneElement operator&(const SceneElement& a, const SceneElement& b) {
@@ -650,8 +627,6 @@ namespace CA4G {
 		virtual void SetupScene() {
 			if (this->scene->Vertices().Count > 0)
 				currentVersion.Upgrade(SceneElement::Vertices);
-			if (this->scene->Indices().Count > 0)
-				currentVersion.Upgrade(SceneElement::Indices);
 			if (this->scene->Materials().Count > 0)
 				currentVersion.Upgrade(SceneElement::Materials);
 			if (this->scene->getTransformsBuffer().Count > 0)

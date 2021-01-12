@@ -18,7 +18,8 @@ public:
 		struct Program : public RTProgram<RTXPathtracing> {
 
 			void Setup() {
-				__set Payload(28);
+				__set Payload(24);
+				__set StackSize(1);
 
 				__load Shader(Context()->Generating);
 				__load Shader(Context()->Missing);
@@ -31,11 +32,10 @@ public:
 				binder _set UAV(1, Context()->Accumulation);
 				binder _set UAV(2, Context()->Complexity);
 				binder _set SRV(0, Context()->VertexBuffer);
-				binder _set SRV(1, Context()->IndexBuffer);
-				binder _set SRV(2, Context()->Transforms);
-				binder _set SRV(3, Context()->Materials);
-				binder _set SRV(4, Context()->VolMaterials);
-				binder _set SRV_Array(5, Context()->Textures, Context()->TextureCount);
+				binder _set SRV(1, Context()->Transforms);
+				binder _set SRV(2, Context()->Materials);
+				binder _set SRV(3, Context()->VolMaterials);
+				binder _set SRV_Array(4, Context()->Textures, Context()->TextureCount);
 				binder _set SMP_Static(0, Sampler::Linear());
 				binder _set CBV(1, Context()->AccumulativeInfo);
 
@@ -69,7 +69,6 @@ public:
 
 		// Space 1 (CommonRT.h, CommonPT.h)
 		gObj<Buffer> VertexBuffer;
-		gObj<Buffer> IndexBuffer;
 		gObj<Buffer> Transforms;
 		gObj<Buffer> Materials;
 		gObj<Buffer> VolMaterials;
@@ -80,7 +79,6 @@ public:
 		gObj<Texture2D> Complexity;
 		struct PerGeometryInfo {
 			int StartTriangle;
-			int GeometryVertexOffset;
 			int TransformIndex;
 			int MaterialIndex;
 		} PerGeometry;
@@ -121,7 +119,6 @@ public:
 
 		// Allocate Memory for scene elements
 		pipeline->VertexBuffer = __create Buffer_SRV<SceneVertex>(desc->Vertices().Count);
-		pipeline->IndexBuffer = __create Buffer_SRV<int>(desc->Indices().Count);
 		pipeline->Transforms = __create Buffer_SRV<float4x3>(globalGeometryCount);
 		pipeline->Materials = __create Buffer_SRV<SceneMaterial>(desc->Materials().Count);
 		pipeline->VolMaterials = __create Buffer_SRV<VolumeMaterial>(desc->Materials().Count);
@@ -172,12 +169,6 @@ public:
 		{
 			pipeline->VertexBuffer _copy FromPtr(desc->Vertices().Data);
 			manager _load AllToGPU(pipeline->VertexBuffer);
-		}
-
-		if (+(elements & SceneElement::Indices))
-		{
-			pipeline->IndexBuffer _copy FromPtr(desc->Indices().Data);
-			manager _load AllToGPU(pipeline->IndexBuffer);
 		}
 
 		if (+(elements & SceneElement::Materials))
@@ -244,10 +235,15 @@ public:
 	}
 
 	gObj<InstanceCollection> rtxScene;
+	gObj<Buffer> VB;
 
 	void CreateRTXScene(gObj<RaytracingManager> manager) {
 
 		auto desc = scene->getScene();
+
+		VB = __create Buffer_ADS<SceneVertex>(desc->Vertices().Count);
+		VB _copy FromPtr(desc->Vertices().Data);
+		manager.Dynamic_Cast<GraphicsManager>() _load AllToGPU(VB);
 
 		rtxScene = manager _create Intances();
 		int geometryOffset = 0;
@@ -256,16 +252,15 @@ public:
 			auto instance = desc->Instances().Data[i];
 
 			auto geometryCollection = manager _create TriangleGeometries();
-			geometryCollection _set Transforms(GeometryTransforms);
+			//geometryCollection _set Transforms(GeometryTransforms);
 
 			for (int j = 0; j < instance.Count; j++) // load every geometry
 			{
 				auto geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
 
 				geometryCollection _create Geometry(
-					pipeline->VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount),
-					pipeline->IndexBuffer _create Slice(geometry.StartIndex, geometry.IndexCount),
-					geometry.TransformIndex);
+					VB _create Slice(geometry.StartVertex, geometry.VertexCount),
+					-1);
 			}
 
 			manager _load Geometry(geometryCollection);
@@ -315,8 +310,7 @@ public:
 				auto instance = desc->Instances().Data[i];
 				for (int j = 0; j < instance.Count; j++) {
 					auto geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
-					pipeline->PerGeometry.StartTriangle = geometry.StartIndex / 3;
-					pipeline->PerGeometry.GeometryVertexOffset = geometry.StartVertex;
+					pipeline->PerGeometry.StartTriangle = geometry.StartVertex / 3;
 					pipeline->PerGeometry.MaterialIndex = geometry.MaterialIndex;
 					pipeline->PerGeometry.TransformIndex = geometryOffset + j;
 

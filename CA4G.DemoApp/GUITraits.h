@@ -15,6 +15,7 @@ namespace CA4G {
 
 	struct IShowComplexity {
 		bool ShowComplexity;
+		float PathtracingRatio;
 	};
 }
 

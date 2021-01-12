@@ -115,8 +115,8 @@ namespace CA4G {
 		Engine EngineType;
 
 		// Table with all descriptor ranges bound by this pipeline bindings object.
-		// This list must be on the CPU during bindings.
-		list<D3D12_DESCRIPTOR_RANGE> ranges;
+		// This array must be on the CPU during bindings.
+		table<D3D12_DESCRIPTOR_RANGE> ranges = table<D3D12_DESCRIPTOR_RANGE>(200);
 
 		int globalBindings = 0;
 

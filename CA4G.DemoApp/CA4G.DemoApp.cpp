@@ -36,8 +36,8 @@ int main(int, char**)
 	gObj<Presenter> presenter = new Presenter(hwnd, dxObjects);
 
 	presenter _set WindowResolution(); // Defines the render target to fit the window resolution
-	presenter _set UseFrameBuffering(); // Use frame buffering, that means that next frame will be commiting while previous frame is presented.
-	presenter _set Buffers(3); // Number of in fly frames set to 3.
+	//presenter _set UseFrameBuffering(); // Use frame buffering, that means that next frame will be commiting while previous frame is presented.
+	//presenter _set Buffers(3); // Number of in fly frames set to 3.
 	presenter _set SwapChain(); // Final set of the presenter to create swap chain and device objects.
 
 	// Show the window
@@ -87,9 +87,7 @@ int main(int, char**)
 	if (technique.Dynamic_Cast<IManageScene>())
 		technique.Dynamic_Cast<IManageScene>()->SetSceneManager(scene);
 
-	presenter _load TechniqueObj(technique);
-
-	presenter _create FlushAndSignal().WaitFor();
+	
 
 	// Main loop
 	MSG msg;
@@ -134,6 +132,15 @@ int main(int, char**)
 #ifdef USE_GUI
 		scene->Animate(ImGui::GetTime(), ImGui::GetFrameCount());
 #endif
+
+		static int frameIndex = 0;
+
+		if (frameIndex == 0) {
+			presenter _load TechniqueObj(technique);
+
+			presenter _create FlushAndSignal().WaitFor();
+		}
+		frameIndex++;
 
 		presenter _dispatch TechniqueObj(technique); // excutes the technique 
 		

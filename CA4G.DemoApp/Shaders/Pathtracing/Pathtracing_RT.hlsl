@@ -27,7 +27,6 @@ cbuffer Transforming : register(b1) {
 
 struct RayPayload // Only used for raycasting
 {
-	int VertexOffset;
 	int TriangleIndex;
 	int MaterialIndex;
 	int TransformIndex;
@@ -95,7 +94,7 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 	bool isOutside = true;
 
 	[loop]
-	while (any(importance))
+	while (true)
 	{
 		complexity++;
 
@@ -106,7 +105,7 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 
 		RayPayload payload = (RayPayload)0;
 		if (!Intersect(x, w, payload)) // 
-			return isOutside * importance * (SampleSkybox(w) + SampleLight(w) * (bounces > 0));
+			return importance * (SampleSkybox(w) + SampleLight(w) * (bounces > 0));
 
 		Vertex surfel = (Vertex)0;
 		Material material = (Material)0;
@@ -115,16 +114,18 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 			payload.Barycentric, 
 			payload.MaterialIndex,
 			payload.TriangleIndex,
-			payload.VertexOffset,
 			payload.TransformIndex,
 			surfel, material, volMaterial, 0, 0);
 
 		float d = length(surfel.P - x); // Distance to the hit position.
 		float t = isOutside || volMaterial.Extinction[cmp] == 0 ? 100000000 : -log(max(0.000000000001, 1 - random())) / volMaterial.Extinction[cmp];
 
+		[branch]
 		if (t >= d)
 		{
 			bounces += isOutside;
+			if (bounces >= 5)
+				return 0;
 			SurfelScattering(x, w, importance, surfel, material);
 
 			if (any(material.Specular) && material.Roulette.w > 0)
@@ -137,9 +138,6 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 				return 0;
 			w = ImportanceSamplePhase(volMaterial.G[cmp], w); // scattering event...
 		}
-		
-		if (bounces > 5)
-			break;
 	}
 	return 0;
 }
@@ -148,7 +146,10 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 void OnClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
 	payload.Barycentric = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-	GetIndices(payload.TransformIndex, payload.MaterialIndex, payload.TriangleIndex, payload.VertexOffset);
+	payload.TransformIndex = ObjectInfo.TransformIndex;
+	payload.MaterialIndex = ObjectInfo.MaterialIndex;
+	payload.TriangleIndex = ObjectInfo.StartTriangle + PrimitiveIndex();
+//GetIndices(payload.TransformIndex, payload.MaterialIndex, payload.TriangleIndex);
 }
 
 [shader("miss")]

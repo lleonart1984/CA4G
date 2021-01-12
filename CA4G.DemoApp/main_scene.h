@@ -104,11 +104,11 @@ public:
 
 		CA4G::string platePath = desktopPath + CA4G::string("\\Models\\plate.obj");
 		auto plateScene = OBJLoader::Load(platePath);
-		//scene->appendScene(plateScene);
+		scene->appendScene(plateScene);
 
 		setGlassMaterial(0, 1, 1 / 1.5); // glass lucy
 		setGlassMaterial(1, 1, 1 / 1.5); // glass drago
-		//setMirrorMaterial(2, 0.3); // reflective plate
+		setMirrorMaterial(2, 0.3); // reflective plate
 		
 		scene->VolumeMaterials().Data[0] = VolumeMaterial {
 			float3(500, 500, 500), // sigma
@@ -133,9 +133,9 @@ public:
 
 	void SetTransforms(float time) {
 		scene->Instances().Data[0].Transform =
-			mul(InitialTransforms[0], mul(Transforms::RotateY(time), Transforms::Translate(0.4, 0, 0)));
+			mul(InitialTransforms[0], mul(Transforms::RotateY(time), Transforms::Translate(0.4, 0.0, 0)));
 		scene->Instances().Data[1].Transform =
-			mul(InitialTransforms[1], mul(Transforms::RotateY(time), Transforms::Translate(-0.25, 0, 0)));
+			mul(InitialTransforms[1], mul(Transforms::RotateY(time), Transforms::Translate(-0.3, 0.0, 0)));
 		OnUpdated(SceneElement::InstanceTransforms);
 	}
 

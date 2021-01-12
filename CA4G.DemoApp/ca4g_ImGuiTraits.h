@@ -2,6 +2,7 @@
 
 void GuiFor(gObj<CA4G::IShowComplexity> t) {
 	ImGui::Checkbox("View Complexity", &t->ShowComplexity);
+	ImGui::SliderFloat("Pathtracing", &t->PathtracingRatio, 0, 1);
 }
 
 int selectedMaterial = 0;
