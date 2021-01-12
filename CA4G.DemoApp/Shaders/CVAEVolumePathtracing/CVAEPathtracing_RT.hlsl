@@ -130,7 +130,6 @@ bool GenerateVariablesWithModel(float G, float Phi, float3 win, float density, o
 
 struct RayPayload // Only used for raycasting
 {
-	int VertexOffset;
 	int TriangleIndex;
 	int MaterialIndex;
 	int TransformIndex;
@@ -213,7 +212,6 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 			payload.Barycentric,
 			payload.MaterialIndex,
 			payload.TriangleIndex,
-			payload.VertexOffset,
 			payload.TransformIndex,
 			surfel, material, volMaterial, 0, 0);
 
@@ -233,7 +231,7 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 		{ // Volume scattering or absorption
 			x += t * w; // free traverse in a medium
 
-			bool UsePT = true;
+			bool UsePT = DispatchRaysIndex().x < DispatchRaysDimensions().x* PathtracingRatio;
 
 			if (UsePT)
 			{
@@ -268,7 +266,7 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 void OnClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
 	payload.Barycentric = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-	GetIndices(payload.TransformIndex, payload.MaterialIndex, payload.TriangleIndex, payload.VertexOffset);
+	GetIndices(payload.TransformIndex, payload.MaterialIndex, payload.TriangleIndex);
 }
 
 [shader("miss")]

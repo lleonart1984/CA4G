@@ -722,8 +722,12 @@ namespace CA4G {
 			for (int i = 0; i < normalIndices.size(); i++)
 				vertices[positionIndices[i]].TexCoord = texcoords[textureIndices[i]];
 
-			int vertexOffset = scene->appendVertices(vertices, positions.size()); // bind vertices (vertexOffset should be 0).
-			int indexOffset = scene->appendIndices(&positionIndices.first(), positionIndices.size()); // bind indices (indexOffset should be 0)
+			SceneVertex* directVertices = new SceneVertex[positionIndices.size()];
+			for (int i = 0; i < positionIndices.size(); i++)
+				directVertices[i] = vertices[positionIndices[i]];
+			
+			int vertexOffset = scene->appendVertices(directVertices, positionIndices.size()); // bind vertices (vertexOffset should be 0).
+			//int indexOffset = scene->appendIndices(&positionIndices.first(), positionIndices.size()); // bind indices (indexOffset should be 0)
 
 			#pragma endregion
 
@@ -753,22 +757,22 @@ namespace CA4G {
 					else break; // finish merging
 				if (nextGroupStart != currentGroupStart) {
 
-					geometries.add(scene->appendGeometry(vertexOffset, indexOffset, 0, positions.size(), currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
+					geometries.add(scene->appendGeometry(vertexOffset, currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
 					currentGroupStart = nextGroupStart;
 				}
 			}
 			nextGroupStart = positionIndices.size();
 			if (nextGroupStart != currentGroupStart) { // last range of indices...
-				geometries.add(scene->appendGeometry(vertexOffset, indexOffset, 0, positions.size(), currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, geometries.size()));
+				geometries.add(scene->appendGeometry(vertexOffset, currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
 			}
 
 			#pragma endregion
 
 			#pragma region Generate Identity transforms
 
-			for (int i = 0; i < geometries.size(); i++)
+			/*for (int i = 0; i < geometries.size(); i++)
 				scene->appendTransform( float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
-			
+			*/
 			#pragma endregion
 
 			#pragma region Creating Instances

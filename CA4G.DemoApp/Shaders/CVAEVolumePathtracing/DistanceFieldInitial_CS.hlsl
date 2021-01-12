@@ -4,10 +4,9 @@
 #include "../Tools/Distances.h"
 
 StructuredBuffer<Vertex> Vertices : register(t0); // Geometry vertices
-StructuredBuffer<int> IndexBuffer : register(t1); // Geometry indices per triangle
-StructuredBuffer<int> TriangleIndices : register(t2); // Linked list values (references to the triangles)
-Texture3D<int> Head : register(t3); // Per cell linked list head
-StructuredBuffer<int> Next : register(t4); // Per linked lists next references....
+StructuredBuffer<int> TriangleIndices : register(t1); // Linked list values (references to the triangles)
+Texture3D<int> Head : register(t2); // Per cell linked list head
+StructuredBuffer<int> Next : register(t3); // Per linked lists next references....
 
 
 /// Initial distance field grid with only distances to adjacent cells.
@@ -23,9 +22,9 @@ cbuffer GridTransform : register(b0) {
 
 /// Gets the triangle in Grid space (0,0,0)-(Size, Size, Size)
 void GetTriangle(int triangleIndex, inout float3 t[3]) {
-	t[0] = mul(float4(Vertices[IndexBuffer[triangleIndex*3+0]].P, 1), FromGeometryToGrid).xyz;
-	t[1] = mul(float4(Vertices[IndexBuffer[triangleIndex*3+1]].P, 1), FromGeometryToGrid).xyz;
-	t[2] = mul(float4(Vertices[IndexBuffer[triangleIndex*3+2]].P, 1), FromGeometryToGrid).xyz;
+	t[0] = mul(float4(Vertices[triangleIndex*3+0].P, 1), FromGeometryToGrid).xyz;
+	t[1] = mul(float4(Vertices[triangleIndex*3+1].P, 1), FromGeometryToGrid).xyz;
+	t[2] = mul(float4(Vertices[triangleIndex*3+2].P, 1), FromGeometryToGrid).xyz;
 }
 
 [numthreads(1024, 1, 1)]

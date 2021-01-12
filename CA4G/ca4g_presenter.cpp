@@ -689,7 +689,7 @@ namespace CA4G {
 			CComPtr<IDXGIAdapter1> hardwareAdapter;
 			GetHardwareAdapter(factory, hardwareAdapter);
 
-			//EnableComputeRaytracingFallback(hardwareAdapter);
+			EnableComputeRaytracingFallback(hardwareAdapter);
 
 			D3D12CreateDevice(
 				hardwareAdapter,

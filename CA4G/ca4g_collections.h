@@ -193,6 +193,12 @@ namespace CA4G {
 			elements = new T[capacity];
 			ZeroMemory(elements, sizeof(T) * capacity);
 		}
+		list(int capacity) {
+			this->capacity = capacity;
+			count = 0;
+			elements = new T[capacity];
+			ZeroMemory(elements, sizeof(T) * capacity);
+		}
 		list(const list<T>& other) {
 			this->count = other.count;
 			this->elements = new T[other.capacity];
@@ -250,6 +256,96 @@ namespace CA4G {
 			}
 			elements[count] = item;
 			return count++;
+		}
+
+		inline T& operator[](int index) const {
+			return elements[index];
+		}
+
+		inline T& first() const {
+			return elements[0];
+		}
+
+		inline T& last() const {
+			return elements[count - 1];
+		}
+
+		inline int size() const {
+			return count;
+		}
+	};
+
+
+	template<typename T>
+	class table
+	{
+		T* elements;
+		int count;
+		int capacity;
+		int* references;
+	public:
+		table() {
+			elements = nullptr;
+			references = nullptr;
+			count = capacity = 0;
+		}
+		table(int capacity) {
+			this->capacity = capacity;
+			count = 0;
+			elements = new T[capacity];
+			ZeroMemory(elements, sizeof(T) * capacity);
+			references = new int(1);
+		}
+		table(const table<T>& other) {
+			this->count = other.count;
+			this->elements = other.elements;
+			this->capacity = other.capacity;
+			this->references = other.references;
+			__AddReference();
+		}
+		void __RemoveReference() {
+			if (references) // not null
+			{
+				if (--(*references) == 0)
+					delete[] elements;
+			}
+		}
+		void __AddReference() {
+			if (this->references)
+				++(*this->references);
+		}
+	public:
+
+		void reset() {
+			count = 0;
+			ZeroMemory(elements, sizeof(T) * capacity);
+		}
+
+		table<T>& operator = (const table<T>& other) {
+			__RemoveReference();
+			this->references = other.references;
+			this->length = other.length;
+			this->text = other.text;
+			__AddReference();
+			return *this;
+		}
+
+		~table() {
+			__RemoveReference();
+		}
+
+		/// pushes an item at the begining
+		void push(T item) {
+			add(item);
+			for (int i = count - 1; i > 0; i--)
+				elements[i] = elements[i - 1];
+			elements[0] = item;
+		}
+
+		void add(T item) {
+			if (count == capacity)
+				throw CA4GException("Table overflow.");
+			elements[count++] = item;
 		}
 
 		inline T& operator[](int index) const {

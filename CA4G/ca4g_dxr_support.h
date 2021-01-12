@@ -309,7 +309,7 @@ namespace CA4G {
 
 	struct ExportsManager : public virtual DynamicStateBindingOf<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION, D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION>
 	{
-		void SetExportsAssociations(int index, D3D12_STATE_SUBOBJECT* ptrToSubobject, const list<LPCWSTR>& exports) {
+		void SetExportsAssociations(int index, D3D12_STATE_SUBOBJECT* ptrToSubobject, const table<LPCWSTR>& exports) {
 			auto state = GetAfterCreate(index);
 			state->pSubobjectToAssociate = ptrToSubobject;
 			state->NumExports = exports.size();

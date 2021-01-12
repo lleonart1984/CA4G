@@ -31,13 +31,13 @@ namespace CA4G {
 		// Gets the list of all hit groups created in this rt program
 		list<gObj<HitGroupHandle>> hitGroups;
 		// Gets the list of all associations between shaders and global bindings
-		list<LPCWSTR> associationsToGlobal;
+		table<LPCWSTR> associationsToGlobal = table<LPCWSTR>(500);
 		// Gets the list of all associations between shaders and raygen local bindings
-		list<LPCWSTR> associationsToRayGenLocals;
+		table<LPCWSTR> associationsToRayGenLocals = table<LPCWSTR>(500);
 		// Gets the list of all associations between shaders and miss local bindings
-		list<LPCWSTR> associationsToMissLocals;
+		table<LPCWSTR> associationsToMissLocals = table<LPCWSTR>(500);
 		// Gets the list of all associations between shaders and hitgroup local bindings
-		list<LPCWSTR> associationsToHitGroupLocals;
+		table<LPCWSTR> associationsToHitGroupLocals = table<LPCWSTR>(500);
 
 		list<gObj<ProgramHandle>> loadedShaderPrograms;
 
@@ -371,11 +371,10 @@ namespace CA4G {
 		soDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 		soDesc.NumSubobjects = index;
 		soDesc.pSubobjects = this->dynamicStates;
-
 		
-			auto hr = dxWrapper->device->CreateStateObject(&soDesc, IID_PPV_ARGS(&wrapper->stateObject));
-			if (FAILED(hr))
-				throw CA4GException::FromError(CA4G_Errors_BadPSOConstruction, nullptr, hr);
+		auto hr = dxWrapper->device->CreateStateObject(&soDesc, IID_PPV_ARGS(&wrapper->stateObject));
+		if (FAILED(hr))
+			throw CA4GException::FromError(CA4G_Errors_BadPSOConstruction, nullptr, hr);
 
 		// Get All shader identifiers
 		for (int i = 0; i < wrapper->programs.size(); i++)
@@ -830,7 +829,6 @@ namespace CA4G {
 
 		wrapper->usedGeometries->add(geometries);
 		wrapper->structuralVersion++;
-
 
 		D3D12_RAYTRACING_INSTANCE_DESC d{ };
 		d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;

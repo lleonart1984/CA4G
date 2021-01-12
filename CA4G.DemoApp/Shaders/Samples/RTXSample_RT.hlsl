@@ -21,7 +21,7 @@ bool Intersect(float3 P, float3 D, out int tIndex) {
 	ray.Direction = D;
 	ray.TMin = 0;
 	ray.TMax = 100.0;
-	TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload);
+	TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload);
 	tIndex = payload.Index;
 	return tIndex >= 0;
 }
