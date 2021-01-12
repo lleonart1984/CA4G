@@ -71,10 +71,10 @@ public:
 	void SetupScene() {
 
 		camera.Position = float3(0, 0.0, 1.7);
-		camera.Target = float3(0,0.0,0);
+		camera.Target = float3(0, 0.0, 0);
 		//camera.Position = float3(0, 0.5, 1.7);
 		//camera.Target = float3(0, 0.4, 0);
-		
+
 		lights[0].Direction = normalize(float3(0, 1, 1));
 		lights[0].Intensity = float3(6, 6, 6);
 

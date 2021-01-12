@@ -6,15 +6,17 @@
 #include "Definitions.h"
 
 StructuredBuffer<Vertex> VertexBuffer			: register(t0, space1);	// All vertices in scene.
-StructuredBuffer<float4x3> Transforms			: register(t1, space1); // All materials.
-StructuredBuffer<Material> Materials			: register(t2, space1); // All materials.
-StructuredBuffer<VolumeMaterial> VolMaterials	: register(t3, space1); // All materials.
-Texture2D<float4> Textures[500]					: register(t4, space1); // All textures used
+StructuredBuffer<int> IndexBuffer				: register(t1, space1); // Indices of geometries in scene.
+StructuredBuffer<float4x3> Transforms			: register(t2, space1); // All materials.
+StructuredBuffer<Material> Materials			: register(t3, space1); // All materials.
+StructuredBuffer<VolumeMaterial> VolMaterials	: register(t4, space1); // All materials.
+Texture2D<float4> Textures[500]					: register(t5, space1); // All textures used
 
 RWTexture2D<float3> Output						: register(u0, space1); // Final Output image from the ray-trace
 
 struct ObjInfo {
 	int StartTriangle;
+	int VertexOffset;
 	int TransformIndex;
 	int MaterialIndex;
 };
@@ -41,25 +43,27 @@ void AugmentHitInfoWithTextureMapping(inout Vertex surfel, inout Material materi
 	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
 }
 
-void GetIndices(out int transformIndex, out int materialIndex, out int triangleIndex) {
+void GetIndices(out int transformIndex, out int materialIndex, out int triangleIndex, out int vertexOffset) {
 	transformIndex = ObjectInfo.TransformIndex;
 	materialIndex = ObjectInfo.MaterialIndex;
 	triangleIndex = ObjectInfo.StartTriangle + PrimitiveIndex();
+	vertexOffset = ObjectInfo.VertexOffset;
 }
 
 void GetHitInfo(
 	float3 barycentrics, 
 	int materialIndex,
 	int triangleIndex, 
+	int vertexOffset,
 	int transformIndex,
 	out Vertex surfel, 
 	out Material material, 
 	out VolumeMaterial volumeMaterial,
 	float ddx, float ddy)
 {
-	Vertex v1 = VertexBuffer[triangleIndex*3 + 0];
-	Vertex v2 = VertexBuffer[triangleIndex*3 + 1];
-	Vertex v3 = VertexBuffer[triangleIndex*3 + 2];
+	Vertex v1 = VertexBuffer[IndexBuffer[triangleIndex * 3 + 0] + vertexOffset];
+	Vertex v2 = VertexBuffer[IndexBuffer[triangleIndex * 3 + 1] + vertexOffset];
+	Vertex v3 = VertexBuffer[IndexBuffer[triangleIndex * 3 + 2] + vertexOffset];
 	Vertex s = {
 		v1.P * barycentrics.x + v2.P * barycentrics.y + v3.P * barycentrics.z,
 		v1.N * barycentrics.x + v2.N * barycentrics.y + v3.N * barycentrics.z,

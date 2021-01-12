@@ -5,7 +5,8 @@
 #include "../Tools/Definitions.h"
 
 // Geometry description (Only geometric information needed)
-StructuredBuffer<Vertex> Vertices : register(t0);
+StructuredBuffer<Vertex> Vertices	: register(t0);
+StructuredBuffer<int> Indices		: register(t1);
 
 // Triangles indices for each node of the linked lists
 RWStructuredBuffer<int> TriangleIndices : register(u0); // Linked list values (references to the triangles)
@@ -30,14 +31,14 @@ float3 FromPositionToCell(float3 P) {
 void main(uint3 DTid : SV_DispatchThreadID)
 {
 	uint NumberOfVertices, stride;
-	Vertices.GetDimensions(NumberOfVertices, stride);
+	Indices.GetDimensions(NumberOfVertices, stride);
 
 	if (DTid.x >= NumberOfVertices/3)
 		return;
 
-	float3 c1 = FromPositionToCell(Vertices[DTid.x * 3 + 0].P);
-	float3 c2 = FromPositionToCell(Vertices[DTid.x * 3 + 1].P);
-	float3 c3 = FromPositionToCell(Vertices[DTid.x * 3 + 2].P);
+	float3 c1 = FromPositionToCell(Vertices[Indices[DTid.x * 3 + 0]].P);
+	float3 c2 = FromPositionToCell(Vertices[Indices[DTid.x * 3 + 1]].P);
+	float3 c3 = FromPositionToCell(Vertices[Indices[DTid.x * 3 + 2]].P);
 
 	float3 P = c1;
 	// this is a seudo normal used to determine plane side of cell corners.

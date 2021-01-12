@@ -28,7 +28,7 @@ float3 SampleSkybox(float3 L) {
 	col = lerp(col, BG_COLORS[2], smoothstep(BG_DISTS[1], BG_DISTS[2], L.y));
 	col = lerp(col, BG_COLORS[3], smoothstep(BG_DISTS[2], BG_DISTS[3], L.y));
 	col = lerp(col, BG_COLORS[4], smoothstep(BG_DISTS[3], BG_DISTS[4], L.y));
-	return 0;// col;// col;
+	return 0;// col;
 }
 
 float3 SampleLight(float3 L)

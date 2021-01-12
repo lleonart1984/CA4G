@@ -24,7 +24,7 @@ public:
 	void OnLoad() override {
 	}
 
-	struct ClearingTagData  {
+	struct ClearingTagData {
 		float4 clearColor;
 	};
 
@@ -60,7 +60,7 @@ public:
 	};
 
 	struct Pipeline : public GraphicsPipelineBindings {
-		
+
 		gObj<Texture2D> RenderTarget;
 		gObj<Texture2D> Texture;
 
@@ -77,9 +77,9 @@ public:
 		}
 
 		void Bindings(gObj<GraphicsBinder> binder) {
-			
+
 			binder _set BindingsOnSet();
-			
+
 			binder _set PixelShaderBindings();
 			binder _set RTV(0, RenderTarget);
 			binder _set SRV(0, Texture);
@@ -116,7 +116,7 @@ public:
 		texture _copy RegionFromPtr((byte*)&pixel, D3D12_BOX{ 0,0,0,1,1,1 });
 
 		pipeline = __create Pipeline<Pipeline>();
-		
+
 		__dispatch member_collector(LoadAssets);
 	}
 
@@ -139,8 +139,8 @@ public:
 		manager _set VertexBuffer(vertexBuffer);
 		manager _set IndexBuffer(indexBuffer);
 		manager _set Viewport(render_target->Width, render_target->Height);
-		
-		manager _clear RT(render_target, float3(0.2f, sin(frame*0.001), 0.5f));
+
+		manager _clear RT(render_target, float3(0.2f, sin(frame * 0.001), 0.5f));
 
 		manager _dispatch IndexedTriangles(6);
 	}
@@ -157,6 +157,7 @@ public:
 	~SceneSample() {}
 
 	gObj<Buffer> VertexBuffer;
+	gObj<Buffer> IndexBuffer;
 	gObj<Buffer> Camera;
 	gObj<Buffer> Lighting;
 	gObj<Buffer> GeometryTransforms;
@@ -182,7 +183,7 @@ public:
 		gObj<Buffer> GeometryTransforms;
 		gObj<Buffer> Camera;
 		gObj<Texture2D> Texture;
-		
+
 		struct ObjectInfoCB {
 			int InstanceIndex;
 			int TransformIndex;
@@ -227,9 +228,10 @@ public:
 	virtual void OnLoad() override {
 
 		auto desc = scene->getScene();
-		
+
 		// Allocate Memory for scene elements
 		VertexBuffer = __create Buffer_VB<SceneVertex>(desc->Vertices().Count);
+		IndexBuffer = __create Buffer_IB<int>(desc->Indices().Count);
 		Camera = __create Buffer_CB<CameraCB>();
 		Lighting = __create Buffer_CB<LightingCB>();
 		GeometryTransforms = __create Buffer_SRV<float4x3>(desc->getTransformsBuffer().Count);
@@ -257,7 +259,13 @@ public:
 			VertexBuffer _copy FromPtr(desc->Vertices().Data);
 			manager _load AllToGPU(VertexBuffer);
 		}
-		
+
+		if (+(elements & SceneElement::Indices))
+		{
+			IndexBuffer _copy FromPtr(desc->Indices().Data);
+			manager _load AllToGPU(IndexBuffer);
+		}
+
 		if (+(elements & SceneElement::Camera))
 		{
 			float4x4 proj, view;
@@ -312,7 +320,7 @@ public:
 	void DrawScene(gObj<GraphicsManager> manager) {
 		pipeline->RenderTarget = render_target;
 		manager _set Pipeline(pipeline);
-		manager _set VertexBuffer(VertexBuffer);
+		manager _set IndexBuffer(IndexBuffer);
 		manager _set Viewport(render_target->Width, render_target->Height);
 
 		manager _clear RT(render_target, float3(0.2f, 0.2f, 0.5f));
@@ -328,6 +336,8 @@ public:
 				pipeline->ObjectInfo.TransformIndex = geometry.TransformIndex;
 				pipeline->ObjectInfo.MaterialIndex = geometry.MaterialIndex;
 
+				manager _set VertexBuffer(VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount));
+
 				pipeline->Texture = nullptr;
 				if (geometry.MaterialIndex != -1)
 				{
@@ -335,7 +345,7 @@ public:
 					if (textureIndex != -1)
 						pipeline->Texture = Textures[textureIndex];
 				}
-				manager _dispatch Triangles(geometry.VertexCount, geometry.StartVertex);
+				manager _dispatch IndexedTriangles(geometry.IndexCount, geometry.StartIndex);
 			}
 		}
 	}
@@ -351,6 +361,7 @@ public:
 	~UAVSample() {}
 
 	gObj<Buffer> VertexBuffer;
+	gObj<Buffer> IndexBuffer;
 	gObj<Buffer> Camera;
 	gObj<Buffer> GeometryTransforms;
 	gObj<Buffer> InstanceTransforms;
@@ -410,6 +421,7 @@ public:
 
 		// Allocate Memory for scene elements
 		VertexBuffer = __create Buffer_VB<SceneVertex>(desc->Vertices().Count);
+		IndexBuffer = __create Buffer_IB<int>(desc->Indices().Count);
 		Camera = __create Buffer_CB<CameraCB>();
 		GeometryTransforms = __create Buffer_SRV<float4x3>(desc->getTransformsBuffer().Count);
 		InstanceTransforms = __create Buffer_SRV<float4x4>(desc->Instances().Count);
@@ -429,7 +441,7 @@ public:
 			});
 
 		__dispatch member_collector(UpdateDirtyElements);
-	
+
 		__dispatch member_collector(LoadScreenVertices);
 	}
 
@@ -446,6 +458,12 @@ public:
 		{
 			VertexBuffer _copy FromPtr(desc->Vertices().Data);
 			manager _load AllToGPU(VertexBuffer);
+		}
+
+		if (+(elements & SceneElement::Indices))
+		{
+			IndexBuffer _copy FromPtr(desc->Indices().Data);
+			manager _load AllToGPU(IndexBuffer);
 		}
 
 		if (+(elements & SceneElement::Camera))
@@ -492,7 +510,7 @@ public:
 		pipeline->CountingBuffer = Complexity;
 
 		manager _set Pipeline(pipeline);
-		manager _set VertexBuffer(VertexBuffer);
+		manager _set IndexBuffer(IndexBuffer);
 		manager _set Viewport(render_target->Width, render_target->Height);
 
 		manager _clear RT(render_target, float3(0.2f, 0.2f, 0.5f));
@@ -505,9 +523,12 @@ public:
 			InstanceDescription instance = desc->Instances().Data[i];
 			for (int j = 0; j < instance.Count; j++) {
 				GeometryDescription geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
+
+				manager _set VertexBuffer(VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount));
+
 				pipeline->ObjectInfo.TransformIndex = geometry.TransformIndex;
 				pipeline->ObjectInfo.MaterialIndex = geometry.MaterialIndex;
-				manager _dispatch Triangles(geometry.VertexCount, geometry.StartVertex);
+				manager _dispatch IndexedTriangles(geometry.IndexCount, geometry.StartIndex);
 			}
 		}
 	}
@@ -537,12 +558,13 @@ public:
 	};
 
 	gObj<Buffer> VertexBuffer;
+	gObj<Buffer> IndexBuffer;
 	gObj<Buffer> Transforms;
 	gObj<Buffer> GeometryTransforms;
 	gObj<Buffer> InstanceTransforms;
 	gObj<Texture2D> OutputImage;
 
-	struct RTXSample: public RaytracingPipelineBindings {
+	struct RTXSample : public RaytracingPipelineBindings {
 		struct Program : public RTProgram<RTXSample> {
 
 			void Setup() {
@@ -550,7 +572,7 @@ public:
 				__load Shader(Context()->Missing);
 				__load Shader(Context()->Hitting);
 			}
-			
+
 			void Bindings(gObj<RaytracingBinder> binder) {
 				binder _set BindingsOnSet();
 				binder _set ADS(0, Context()->Scene);
@@ -562,9 +584,9 @@ public:
 
 		void Setup() {
 			__load Code(ShaderLoader::FromFile("./Shaders/Samples/RTXSample_RT.cso"));
-			Generating			= __create Shader<RayGenerationHandle>(L"RayGen");
-			Missing				= __create Shader<MissHandle>(L"OnMiss");
-			auto closestHit		= __create Shader<ClosestHitHandle>(L"OnClosestHit");
+			Generating = __create Shader<RayGenerationHandle>(L"RayGen");
+			Missing = __create Shader<MissHandle>(L"OnMiss");
+			auto closestHit = __create Shader<ClosestHitHandle>(L"OnClosestHit");
 			Hitting = __create HitGroup(closestHit, nullptr, nullptr);
 
 			__load Program(MainProgram);
@@ -587,6 +609,7 @@ public:
 
 		// Allocate Memory for scene elements
 		VertexBuffer = __create Buffer_SRV<SceneVertex>(desc->Vertices().Count);
+		IndexBuffer = __create Buffer_SRV<int>(desc->Indices().Count);
 		Transforms = __create Buffer_CB<TransformsCB>();
 		GeometryTransforms = __create Buffer_SRV<float4x3>(desc->getTransformsBuffer().Count);
 		InstanceTransforms = __create Buffer_SRV<float4x4>(desc->Instances().Count);
@@ -595,7 +618,7 @@ public:
 		pipeline = __create Pipeline<RTXSample>();
 		pipeline->Transforms = Transforms;
 		pipeline->Output = OutputImage;
-		
+
 		__dispatch member_collector(UpdateDirtyElements);
 
 		__dispatch member_collector(CreateSceneOnGPU);
@@ -612,13 +635,19 @@ public:
 			manager _load AllToGPU(VertexBuffer);
 		}
 
+		if (+(elements & SceneElement::Indices))
+		{
+			IndexBuffer _copy FromPtr(desc->Indices().Data);
+			manager _load AllToGPU(IndexBuffer);
+		}
+
 		if (+(elements & SceneElement::Camera))
 		{
 			float4x4 proj, view;
 			scene->getCamera().GetMatrices(render_target->Width, render_target->Height, view, proj);
 			Transforms _copy FromValue(TransformsCB{
 					mul(inverse(proj), inverse(view))
-			});
+				});
 			manager _load AllToGPU(Transforms);
 		}
 
@@ -643,9 +672,9 @@ public:
 	gObj<InstanceCollection> rtxScene;
 
 	void CreateSceneOnGPU(gObj<RaytracingManager> manager) {
-		
+
 		auto desc = scene->getScene();
-		
+
 		rtxScene = manager _create Intances();
 		for (int i = 0; i < desc->Instances().Count; i++)
 		{
@@ -653,14 +682,20 @@ public:
 
 			auto geometryCollection = manager _create TriangleGeometries();
 			geometryCollection _set Transforms(GeometryTransforms);
-		
+
 			for (int j = 0; j < instance.Count; j++) // load every geometry
 			{
 				auto geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
 
-				geometryCollection _create Geometry(
-					VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount),
-					geometry.TransformIndex);
+				if (IndexBuffer)
+					geometryCollection _create Geometry(
+						VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount), 
+						IndexBuffer _create Slice(geometry.StartIndex, geometry.IndexCount),
+						geometry.TransformIndex);
+				else
+					geometryCollection _create Geometry(
+						VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount),
+						geometry.TransformIndex);
 			}
 
 			manager _load Geometry(geometryCollection);
@@ -699,7 +734,7 @@ public:
 	}
 
 	void DrawScene(gObj<RaytracingManager> manager) {
-		
+
 		manager _set Pipeline(pipeline);
 		manager _set Program(pipeline->MainProgram);
 
@@ -708,7 +743,6 @@ public:
 			manager _set RayGeneration(pipeline->Generating);
 			manager _set Miss(pipeline->Missing, 0);
 			manager _set HitGroup(pipeline->Hitting, 0);
-			manager _set HitGroup(pipeline->Hitting, 1);
 			firstTime = false;
 		}
 
