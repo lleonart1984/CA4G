@@ -131,6 +131,7 @@ bool GenerateVariablesWithModel(float G, float Phi, float3 win, float density, o
 struct RayPayload // Only used for raycasting
 {
 	int TriangleIndex;
+	int VertexOffset;
 	int MaterialIndex;
 	int TransformIndex;
 	float3 Barycentric;
@@ -212,6 +213,7 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 			payload.Barycentric,
 			payload.MaterialIndex,
 			payload.TriangleIndex,
+			payload.VertexOffset,
 			payload.TransformIndex,
 			surfel, material, volMaterial, 0, 0);
 
@@ -222,6 +224,10 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 		if (t >= d)
 		{
 			bounces += isOutside;
+			
+			if (bounces > 5)
+				return 0;
+
 			SurfelScattering(x, w, importance, surfel, material);
 
 			if (any(material.Specular) && material.Roulette.w > 0)
@@ -255,18 +261,14 @@ float3 ComputePath(float3 O, float3 D, inout int complexity)
 				x += _x * r;
 			}
 		}
-
-		if (bounces > 5)
-			break;
 	}
-	return 0;
 }
 
 [shader("closesthit")]
 void OnClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
 	payload.Barycentric = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-	GetIndices(payload.TransformIndex, payload.MaterialIndex, payload.TriangleIndex);
+	GetIndices(payload.TransformIndex, payload.MaterialIndex, payload.TriangleIndex, payload.VertexOffset);
 }
 
 [shader("miss")]

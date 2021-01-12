@@ -1,7 +1,7 @@
 #include "ca4g_scene.h"
 
 namespace CA4G {
-	
+
 #pragma region Tokenizer
 
 	class Tokenizer
@@ -202,7 +202,7 @@ namespace CA4G {
 	};
 
 #pragma endregion
-	
+
 #pragma region Importing Materials
 
 	struct OBJLoaderState {
@@ -306,8 +306,8 @@ namespace CA4G {
 					if (r > 0) {
 						//t.readFloatToken(g);
 						//t.readFloatToken(b);
-						currentMaterial.Roulette.x = (1 - r)*0.5;
-						currentMaterial.Roulette.y = (1 - r)*0.5;
+						currentMaterial.Roulette.x = (1 - r) * 0.5;
+						currentMaterial.Roulette.y = (1 - r) * 0.5;
 						currentMaterial.Roulette.z = r;
 					}
 					t.skipCurrentLine();
@@ -321,8 +321,8 @@ namespace CA4G {
 					if (r < 1) {
 						//t.readFloatToken(g);
 						//t.readFloatToken(b);
-						currentMaterial.Roulette.x = r*0.5;
-						currentMaterial.Roulette.y = r*0.5;
+						currentMaterial.Roulette.x = r * 0.5;
+						currentMaterial.Roulette.y = r * 0.5;
 						currentMaterial.Roulette.w = 1 - r;
 					}
 					t.skipCurrentLine();
@@ -401,7 +401,7 @@ namespace CA4G {
 			fclose(f);
 		}
 
-		void addLineIndex(list<int> &indices, int index, int pos, int total) {
+		void addLineIndex(list<int>& indices, int index, int pos, int total) {
 			if (index <= 0)
 				index = total + index - 1;
 			else
@@ -706,7 +706,7 @@ namespace CA4G {
 
 			fclose(stream);
 
-			#pragma region Prepare vertex buffer and index buffer
+#pragma region Prepare vertex buffer and index buffer
 
 			SceneVertex* vertices = new SceneVertex[positions.size()];
 
@@ -722,16 +722,12 @@ namespace CA4G {
 			for (int i = 0; i < normalIndices.size(); i++)
 				vertices[positionIndices[i]].TexCoord = texcoords[textureIndices[i]];
 
-			SceneVertex* directVertices = new SceneVertex[positionIndices.size()];
-			for (int i = 0; i < positionIndices.size(); i++)
-				directVertices[i] = vertices[positionIndices[i]];
-			
-			int vertexOffset = scene->appendVertices(directVertices, positionIndices.size()); // bind vertices (vertexOffset should be 0).
-			//int indexOffset = scene->appendIndices(&positionIndices.first(), positionIndices.size()); // bind indices (indexOffset should be 0)
+			int vertexOffset = scene->appendVertices(vertices, positions.size()); // bind vertices (vertexOffset should be 0).
+			int indexOffset = scene->appendIndices(&positionIndices.first(), positionIndices.size()); // bind indices (indexOffset should be 0)
 
-			#pragma endregion
+#pragma endregion
 
-			#pragma region Compute geometry limits and material indices by merging both OBJ limiting, groups (g) and used materials (usemtl).
+#pragma region Compute geometry limits and material indices by merging both OBJ limiting, groups (g) and used materials (usemtl).
 
 			int currentMaterialIndex = -1; // no material used
 			int currentGroup = 0;
@@ -757,37 +753,37 @@ namespace CA4G {
 					else break; // finish merging
 				if (nextGroupStart != currentGroupStart) {
 
-					geometries.add(scene->appendGeometry(vertexOffset, currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
+					geometries.add(scene->appendGeometry(vertexOffset, indexOffset, 0, positions.size(), currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
 					currentGroupStart = nextGroupStart;
 				}
 			}
 			nextGroupStart = positionIndices.size();
 			if (nextGroupStart != currentGroupStart) { // last range of indices...
-				geometries.add(scene->appendGeometry(vertexOffset, currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
+				geometries.add(scene->appendGeometry(vertexOffset, indexOffset, 0, positions.size(), currentGroupStart, nextGroupStart - currentGroupStart, currentMaterialIndex, -1));
 			}
 
-			#pragma endregion
+#pragma endregion
 
-			#pragma region Generate Identity transforms
+#pragma region Generate Identity transforms
 
-			/*for (int i = 0; i < geometries.size(); i++)
-				scene->appendTransform( float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
-			*/
-			#pragma endregion
+			for (int i = 0; i < geometries.size(); i++)
+				scene->appendTransform(float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
 
-			#pragma region Creating Instances
+#pragma endregion
+
+#pragma region Creating Instances
 
 			switch (mode) {
 			case OBJImportMode::SingleInstance:
 				scene->appendInstance(&geometries.first(), geometries.size());
 				break;
 			case OBJImportMode::MultipleInstances:
-				for (int i = 0; i < geometries.size(); i++) 
+				for (int i = 0; i < geometries.size(); i++)
 					scene->appendInstance(&geometries[i], 1);
 				break;
 			}
 
-			#pragma endregion
+#pragma endregion
 		}
 	};
 

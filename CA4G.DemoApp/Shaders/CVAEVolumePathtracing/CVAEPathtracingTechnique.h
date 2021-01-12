@@ -21,6 +21,7 @@ public:
 		}
 
 		gObj<Buffer> VertexBuffer;
+		gObj<Buffer> IndexBuffer;
 		gObj<Buffer> Triangles;
 		gObj<Texture3D> Head;
 		gObj<Buffer> NextBuffer;
@@ -30,6 +31,7 @@ public:
 
 		virtual void Bindings(gObj<ComputeBinder> binder) override {
 			binder _set SRV(0, VertexBuffer);
+			binder _set SRV(1, IndexBuffer);
 
 			binder _set UAV(0, Triangles);
 			binder _set UAV(1, Head);
@@ -46,6 +48,7 @@ public:
 		}
 
 		gObj<Buffer> VertexBuffer;
+		gObj<Buffer> IndexBuffer;
 		gObj<Buffer> Triangles;
 		gObj<Texture3D> Head;
 		gObj<Buffer> NextBuffer;
@@ -56,9 +59,10 @@ public:
 
 		virtual void Bindings(gObj<ComputeBinder> binder) override {
 			binder _set SRV(0, VertexBuffer);
-			binder _set SRV(1, Triangles);
-			binder _set SRV(2, Head);
-			binder _set SRV(3, NextBuffer);
+			binder _set SRV(1, IndexBuffer);
+			binder _set SRV(2, Triangles);
+			binder _set SRV(3, Head);
+			binder _set SRV(4, NextBuffer);
 			
 			binder _set UAV(0, DistanceField);
 
@@ -106,7 +110,7 @@ public:
 		struct Program : public RTProgram<RTXPathtracing> {
 
 			void Setup() {
-				__set Payload(24);
+				__set Payload(28);
 
 				__load Shader(Context()->Generating);
 				__load Shader(Context()->Missing);
@@ -119,10 +123,11 @@ public:
 				binder _set UAV(1, Context()->Accumulation);
 				binder _set UAV(2, Context()->Complexity);
 				binder _set SRV(0, Context()->VertexBuffer);
-				binder _set SRV(1, Context()->Transforms);
-				binder _set SRV(2, Context()->Materials);
-				binder _set SRV(3, Context()->VolMaterials);
-				binder _set SRV_Array(4, Context()->Textures, Context()->TextureCount);
+				binder _set SRV(1, Context()->IndexBuffer);
+				binder _set SRV(2, Context()->Transforms);
+				binder _set SRV(3, Context()->Materials);
+				binder _set SRV(4, Context()->VolMaterials);
+				binder _set SRV_Array(5, Context()->Textures, Context()->TextureCount);
 				binder _set SMP_Static(0, Sampler::Linear());
 				binder _set CBV(1, Context()->AccumulativeInfo);
 
@@ -159,6 +164,7 @@ public:
 
 		// Space 1 (CommonRT.h, CommonPT.h)
 		gObj<Buffer> VertexBuffer;
+		gObj<Buffer> IndexBuffer;
 		gObj<Buffer> Transforms;
 		gObj<Buffer> Materials;
 		gObj<Buffer> VolMaterials;
@@ -169,6 +175,7 @@ public:
 		gObj<Texture2D> Complexity;
 		struct PerGeometryInfo {
 			int StartTriangle;
+			int VertexOffset;
 			int TransformIndex;
 			int MaterialIndex;
 		} PerGeometry;
@@ -212,7 +219,7 @@ public:
 	// Array with a Grid for every geometry.
 	gObj<Texture3D>* perGeometryDF;
 	gObj<Texture3D> tempGrid;
-	int GridSize = 512;
+	int GridSize = 256;
 
 	struct GridInfo {
 		// Index of the base geometry (grid).
@@ -266,6 +273,8 @@ public:
 		// Allocate Memory for scene elements
 		pipeline->VertexBuffer = __create Buffer_SRV<SceneVertex>(desc->Vertices().Count);
 		pipeline->VertexBuffer->SetDebugName(L"Vertex Buffer");
+		pipeline->IndexBuffer = __create Buffer_SRV<int>(desc->Indices().Count);
+		pipeline->IndexBuffer->SetDebugName(L"Index Buffer");
 		pipeline->Transforms = __create Buffer_SRV<float4x3>(globalGeometryCount);
 		pipeline->Materials = __create Buffer_SRV<SceneMaterial>(desc->Materials().Count);
 		pipeline->VolMaterials = __create Buffer_SRV<VolumeMaterial>(desc->Materials().Count);
@@ -321,10 +330,12 @@ public:
 
 #pragma region Compute AABB of geometry and Transform
 			float3 minim = float3(10000, 10000, 10000), maxim = float3(-10000, -10000, -10000);
-			for (int j = 0; j < geom.VertexCount; j++)
+			for (int j = 0; j < geom.IndexCount; j++)
 			{
 				float3 vPos = desc->Vertices().Data[
-					geom.StartVertex + j
+					desc->Indices().Data[
+						geom.StartIndex + j
+					] + geom.StartVertex
 				].Position;
 				minim = minf(minim, vPos);
 				maxim = maxf(maxim, vPos);
@@ -371,14 +382,16 @@ public:
 			// Create grid with triangles linked lists
 			creatingGrid->GridTransform = gridTransforms[i];
 			creatingGrid->VertexBuffer = pipeline->VertexBuffer _create Slice(geom.StartVertex, geom.VertexCount);
+			creatingGrid->IndexBuffer = pipeline->IndexBuffer _create Slice(geom.StartIndex, geom.IndexCount);
 			
 			manager _set Pipeline(creatingGrid);
 			manager _clear UAV(creatingGrid->Head, uint4(-1));
 			manager _clear UAV(creatingGrid->Malloc, uint4(0));
-			manager _dispatch Threads((int)ceil(geom.VertexCount / 3.0 / 1024));
+			manager _dispatch Threads((int)ceil(geom.IndexCount / 3.0 / 1024));
 
 			// Compute initial distances
 			computingInitialDistances->VertexBuffer = pipeline->VertexBuffer _create Slice(geom.StartVertex, geom.VertexCount);
+			computingInitialDistances->IndexBuffer = pipeline->IndexBuffer _create Slice(geom.StartIndex, geom.IndexCount);
 			computingInitialDistances->DistanceField = perGeometryDF[i];
 			computingInitialDistances->GridTransform = gridTransforms[i];
 			manager _set Pipeline(computingInitialDistances);
@@ -446,6 +459,12 @@ public:
 			manager _load AllToGPU(pipeline->VertexBuffer);
 		}
 
+		if (+(elements & SceneElement::Indices))
+		{
+			pipeline->IndexBuffer _copy FromPtr(desc->Indices().Data);
+			manager _load AllToGPU(pipeline->IndexBuffer);
+		}
+
 		if (+(elements & SceneElement::Materials))
 		{
 			pipeline->Materials _copy FromPtr(desc->Materials().Data);
@@ -511,8 +530,6 @@ public:
 							gridTransforms[gridIndex]
 						);
 					float scale = length(gridInfosData[transformIndex].FromWorldToGrid[0].get_xyz());
-					//scale = maxf(scale, length(gridInfosData[transformIndex].FromWorldToGrid[1].get_xyz()));
-					//scale = maxf(scale, length(gridInfosData[transformIndex].FromWorldToGrid[2].get_xyz()));
 					gridInfosData[transformIndex].FromGridToWorldScaling = 1 / scale;
 
 					transformIndex++;
@@ -545,6 +562,7 @@ public:
 
 				geometryCollection _create Geometry(
 					pipeline->VertexBuffer _create Slice(geometry.StartVertex, geometry.VertexCount),
+					pipeline->IndexBuffer _create Slice(geometry.StartIndex, geometry.IndexCount),
 					geometry.TransformIndex);
 			}
 
@@ -595,7 +613,8 @@ public:
 				auto instance = desc->Instances().Data[i];
 				for (int j = 0; j < instance.Count; j++) {
 					auto geometry = desc->Geometries().Data[instance.GeometryIndices[j]];
-					pipeline->PerGeometry.StartTriangle = geometry.StartVertex / 3;
+					pipeline->PerGeometry.StartTriangle = geometry.StartIndex / 3;
+					pipeline->PerGeometry.VertexOffset = geometry.StartVertex;
 					pipeline->PerGeometry.MaterialIndex = geometry.MaterialIndex;
 					pipeline->PerGeometry.TransformIndex = geometryOffset + j;
 
