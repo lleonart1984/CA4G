@@ -174,7 +174,37 @@ namespace CA4G {
 				view->arrayCount * elementStride
 			);
 			break;
+		case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+		{
+			byte* source = data;
+			for (int m = 0; m < view->mipCount; m++)
+			{
+				int index = m + view->mipStart;
+				auto subresourceFootprint = pLayouts[index].Footprint;
+
+				D3D12_SUBRESOURCE_DATA sourceData;
+				sourceData.pData = source;
+				sourceData.RowPitch = subresourceFootprint.Width * elementStride;
+				sourceData.SlicePitch = subresourceFootprint.Width * subresourceFootprint.Height * elementStride;
+
+				D3D12_MEMCPY_DEST destData;
+				destData.pData = permanentUploadingMap + pLayouts[index].Offset;
+				destData.RowPitch = subresourceFootprint.RowPitch;
+				destData.SlicePitch = subresourceFootprint.RowPitch * subresourceFootprint.Height;
+
+				MemcpySubresource(&destData, &sourceData,
+					subresourceFootprint.Width * elementStride,
+					subresourceFootprint.Height,
+					subresourceFootprint.Depth,
+					flipRows
+				);
+
+				source += subresourceFootprint.Depth * subresourceFootprint.Height * subresourceFootprint.Width * elementStride;
+			}
+			break;
+		}
 		default:
+		{
 			byte* source = data;
 			for (int a = 0; a < view->arrayCount; a++)
 				for (int m = 0; m < view->mipCount; m++)
@@ -200,9 +230,10 @@ namespace CA4G {
 						flipRows
 					);
 
-					source += subresourceFootprint.Depth * subresourceFootprint.Height * subresourceFootprint.Width * elementStride;
+					source += subresourceFootprint.Height * subresourceFootprint.Width * elementStride;
 				}
 			break;
+		}
 		}
 	}
 
@@ -215,8 +246,30 @@ namespace CA4G {
 		case D3D12_RESOURCE_DIMENSION_BUFFER:
 			cmdList->CopyBufferRegion(resource, view->arrayStart * elementStride, uploading, view->arrayStart * elementStride, view->arrayCount * elementStride);
 			break;
+		case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+		{
+			for (int m = 0; m < view->mipCount; m++)
+			{
+				int index = m + view->mipStart;
+
+				auto subresourceFootprint = pLayouts[index].Footprint;
+
+				D3D12_TEXTURE_COPY_LOCATION dstData;
+				dstData.pResource = resource;
+				dstData.SubresourceIndex = index;
+				dstData.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+				D3D12_TEXTURE_COPY_LOCATION srcData;
+				srcData.pResource = uploading;
+				srcData.PlacedFootprint = pLayouts[index];
+				srcData.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+
+				cmdList->CopyTextureRegion(&dstData, 0, 0, 0, &srcData, nullptr);
+			}
+			break;
+		}
 		default:
-			// Update slice region from uploading version to resource.
+		{	// Update slice region from uploading version to resource.
 			for (int a = 0; a < view->arrayCount; a++)
 				for (int m = 0; m < view->mipCount; m++)
 				{
@@ -237,6 +290,7 @@ namespace CA4G {
 					cmdList->CopyTextureRegion(&dstData, 0, 0, 0, &srcData, nullptr);
 				}
 			break;
+		}
 		}
 	}
 

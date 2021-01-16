@@ -11,7 +11,8 @@ using namespace CA4G;
 //typedef class UAVSample main_technique;
 //typedef class BasicRaycastSample main_technique;
 //typedef class PathtracingTechnique main_technique;
-typedef class CVAEPathtracingTechnique main_technique;
+//typedef class CVAEPathtracingTechnique main_technique;
+typedef class STFTechnique main_technique;
 
 #pragma region Async Sample
 
@@ -763,5 +764,11 @@ public:
 #pragma region CVAE Volume Pathtracing
 
 #include "./Shaders/CVAEVolumePathtracing/CVAEPathtracingTechnique.h"
+
+#pragma endregion
+
+#pragma region STF Volume Pathtracing
+
+#include "./Shaders/CVAEVolumePathtracing/STFTechnique.h"
 
 #pragma endregion

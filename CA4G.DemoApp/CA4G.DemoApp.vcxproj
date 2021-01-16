@@ -196,6 +196,7 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="Shaders\CVAEVolumePathtracing\CVAEPathtracingTechnique.h" />
     <ClInclude Include="Shaders\CVAEVolumePathtracing\CVAEScatteringModel.h" />
+    <ClInclude Include="Shaders\CVAEVolumePathtracing\STFTechnique.h" />
     <ClInclude Include="Shaders\GUITraits.h" />
     <ClInclude Include="Shaders\Pathtracing\PathtracingTechnique.h" />
     <ClInclude Include="Shaders\Tools\CommonComplexity.h" />
@@ -276,6 +277,20 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Shaders\CVAEVolumePathtracing\STFPathtracing_RT.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
     </FxCompile>
     <FxCompile Include="Shaders\CVAEVolumePathtracing\TriangleGrid_CS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
